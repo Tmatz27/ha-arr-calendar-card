@@ -1,0 +1,10 @@
+{
+  "name": "ha-arr-calendar-card",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "validate": "node --check arr-calendar-card.js && node scripts/validate-hacs.js"
+  },
+  "devDependencies": {}
+}
