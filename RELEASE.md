@@ -19,7 +19,7 @@ git switch main
 git pull --ff-only origin main
 ```
 
-## 2. Publish v0.4.3
+## 2. Publish v0.4.4
 
 The repository includes a release workflow. Push the version tag from the
 updated `main` branch:
@@ -27,20 +27,20 @@ updated `main` branch:
 ```bash
 git switch main
 git pull --ff-only origin main
-git tag -a v0.4.3 -m "Arr Calendar Card v0.4.3"
-git push origin v0.4.3
+git tag -a v0.4.4 -m "Arr Calendar Card v0.4.4"
+git push origin v0.4.4
 ```
 
 The tag starts `.github/workflows/release.yml`, which validates the repository,
 creates the GitHub release, and attaches `arr-calendar-card.js`. On GitHub,
-verify that **Releases** shows `v0.4.3` and that the JavaScript file is attached.
+verify that **Releases** shows `v0.4.4` and that the JavaScript file is attached.
 
 If the tag was accidentally created from the wrong commit, delete it before
 trying again:
 
 ```bash
-git tag -d v0.4.3
-git push origin :refs/tags/v0.4.3
+git tag -d v0.4.4
+git push origin :refs/tags/v0.4.4
 ```
 
 Then update `main`, recreate the tag, and push it again. Do not reuse or silently
@@ -49,10 +49,10 @@ patch version instead.
 
 ## 3. Refresh HACS and Home Assistant
 
-1. In HACS, open **Arr Calendar Card** and select **Update** to `v0.4.3`.
+1. In HACS, open **Arr Calendar Card** and select **Update** to `v0.4.4`.
 2. Wait for the download to finish, then perform a hard refresh of the Home
    Assistant browser or fully close and reopen the companion app.
-3. In the browser developer console, confirm the card banner reports `v0.4.3`.
+3. In the browser developer console, confirm the card banner reports `v0.4.4`.
 
 If HACS still shows the old version, confirm that the GitHub release is published
 (not a draft), its tag is newer than the prior release, and the tag points to the

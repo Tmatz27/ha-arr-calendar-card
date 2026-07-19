@@ -6,9 +6,7 @@
  * Copyright (c) martinargalas, licensed under the MIT License.
  */
 
-const CARD_VERSION = '0.4.3';
-const FILTER_KEY = 'arr-calendar-card.filter';
-const DAYS_KEY = 'arr-calendar-card.days-to-show';
+const CARD_VERSION = '0.4.4';
 const DEFAULT_CONFIG = {
   week_start: 'monday',
   default_filter: 'all',
@@ -22,6 +20,7 @@ const DEFAULT_CONFIG = {
   show_series_title: true,
   show_instance_badges: true,
   days_to_show: 7,
+  show_status_badges: false,
 };
 const SERVICES = [
   { key: 'radarr', type: 'movie', label: 'Radarr' },
@@ -47,18 +46,20 @@ class ArrCalendarCard extends HTMLElement {
     this._loading = true;
     this._dayOffset = 0;
     this._request = 0;
-    this._filter = localStorage.getItem(FILTER_KEY) || DEFAULT_CONFIG.default_filter;
+    this._filter = DEFAULT_CONFIG.default_filter;
   }
 
   setConfig(config) {
     if (!config) throw new Error('Arr Calendar Card requires a configuration.');
     this._config = { ...DEFAULT_CONFIG, ...config };
     this._dayOffset = 0;
-    const savedDays = Number(localStorage.getItem(DAYS_KEY));
+    const savedDays = Number(this._stored('days'));
     this._daysToShow = savedDays >= 1 && savedDays <= 7
       ? savedDays
       : this._configuredDays();
-    this._filter = localStorage.getItem(FILTER_KEY) || this._config.default_filter;
+    this._filter = this._stored('filter') || this._config.default_filter;
+    this._density = this._stored('density') || this._config.item_density;
+    this._cardHeight = this._stored('height') || this._config.card_height;
     this._render();
     this._scheduleRefresh(true);
   }
@@ -81,6 +82,18 @@ class ArrCalendarCard extends HTMLElement {
 
   _configuredDays() {
     return Math.max(1, Math.min(7, Number(this._config.days_to_show) || 7));
+  }
+
+  _preferenceKey(name) {
+    const dashboard = globalThis.location?.pathname || 'default-dashboard';
+    return `arr-calendar-card:${dashboard}:${name}`;
+  }
+
+  _stored(name, value) {
+    const key = this._preferenceKey(name);
+    if (value === undefined) return localStorage.getItem(key);
+    localStorage.setItem(key, String(value));
+    return value;
   }
 
   _startDate(offset = this._dayOffset) {
@@ -172,7 +185,16 @@ class ArrCalendarCard extends HTMLElement {
       season: raw.seasonNumber ?? raw.season,
       episode: raw.episodeNumber ?? raw.episode,
       posters: this._posters(images, service.key),
+      status: this._status(raw),
     };
+  }
+
+  _status(raw) {
+    if (raw.hasFile === true || raw.downloaded === true) return 'Downloaded';
+    if (raw.queueStatus || raw.status === 'queued') return 'Queued';
+    if (raw.monitored === false) return 'Unmonitored';
+    if (raw.monitored === true) return 'Monitored';
+    return '';
   }
 
   _posters(images, serviceKey) {
@@ -235,30 +257,28 @@ class ArrCalendarCard extends HTMLElement {
     } else if (!this._items.length && this._errors.length) {
       content = this._state('error', 'Calendar unavailable', this._errors.join(' · '));
     } else {
-      content = `<section class="week ${html(this._config.item_density)}" style="--visible-days:${dates.length};--week-min:${dates.length * 112}px">${dates.map((date) => this._day(date, todayKey)).join('')}</section>`;
+      content = `<section class="week ${html(this._density)}" style="--visible-days:${dates.length};--week-min:${dates.length * 112}px">${dates.map((date) => this._day(date, todayKey)).join('')}</section>`;
       if (!visibleItems.length) content += this._state('empty-state', 'No releases this week', `Nothing matches the ${this._filter} filter`);
     }
 
     this.shadowRoot.innerHTML = `${this._styles()}<ha-card>
-      <div class="calendar" style="--calendar-height:${html(this._config.card_height)}">
+      <div class="calendar" style="--calendar-height:${html(this._cardHeight)}">
         <header>
           <div class="heading"><h1>Arr Calendar</h1><span>${html(range)}</span></div>
           <nav aria-label="Calendar filters">${['all', 'shows', 'movies'].map((filter) => (
             `<button data-filter="${filter}" class="pill ${this._filter === filter ? 'active' : ''}">${filter[0].toUpperCase() + filter.slice(1)}</button>`
           )).join('')}
             <label class="days-control">Days <select aria-label="Days to show" data-days>${[1, 2, 3, 4, 5, 6, 7].map((days) => `<option value="${days}" ${days === this._daysToShow ? 'selected' : ''}>${days}</option>`).join('')}</select></label>
+            <label class="days-control">Start <input type="date" aria-label="Starting date" data-start-date value="${this._dateKey(dates[0])}"></label>
+            <label class="days-control">Density <select aria-label="Poster density" data-density>${['compact', 'comfortable', 'spacious'].map((density) => `<option ${density === this._density ? 'selected' : ''}>${density}</option>`).join('')}</select></label>
+            <label class="days-control">Height <select aria-label="Card height" data-height>${[['480px', 'Short'], ['720px', 'Medium'], ['960px', 'Tall']].map(([height, label]) => `<option value="${height}" ${height === this._cardHeight ? 'selected' : ''}>${label}</option>`).join('')}</select></label>
           </nav>
-          <div class="header-controls" aria-label="Week navigation">
-            ${this._button('first', '«', 'Go back 52 weeks')}${this._button('prev', '‹', 'Previous week')}
-            ${this._button('today', 'Today', 'Current week', 'today-button')}
-            ${this._button('next', '›', 'Next week')}${this._button('last', '»', 'Go forward 52 weeks')}
-          </div>
         </header>
         <div class="content">${content}</div>
         <footer aria-label="Week navigation">
-          ${this._button('first', '«', 'Go back 52 weeks')}${this._button('prev', '‹', 'Previous week')}
+          ${this._button('first', '«', 'Go back one year')}${this._button('prev', '‹', 'Previous dates')}
           ${this._button('today', this._dayOffset === 0 ? 'Today' : 'Go to today', 'Start with today', 'today-button')}
-          ${this._button('next', '›', 'Next week')}${this._button('last', '»', 'Go forward 52 weeks')}
+          ${this._button('next', '›', 'Next dates')}${this._button('last', '»', 'Go forward one year')}
         </footer>
         ${this._errors.length && this._items.length ? `<div class="warning" title="${html(this._errors.join('\n'))}">Some instances unavailable</div>` : ''}
       </div>
@@ -319,6 +339,7 @@ class ArrCalendarCard extends HTMLElement {
         <div class="badges"><span class="kind">${item.type === 'movie' ? 'Movie' : 'Show'}</span>
           ${episodes.length > 1 ? `<span class="count">${episodes.length} episodes</span>` : ''}
           ${this._config.show_instance_badges ? `<span class="instance">${html(item.instance)}</span>` : ''}
+          ${this._config.show_status_badges && item.status ? `<span class="status">${html(item.status)}</span>` : ''}
         </div>
         ${episodeSummary ? `<span class="episode-code">${html(episodeSummary)}</span>` : ''}
         ${this._config.show_series_title || item.type === 'movie' ? `<strong>${html(item.title)}</strong>` : ''}
@@ -341,16 +362,33 @@ class ArrCalendarCard extends HTMLElement {
     this.shadowRoot.querySelectorAll('[data-filter]').forEach((button) => {
       button.onclick = () => {
         this._filter = button.dataset.filter;
-        localStorage.setItem(FILTER_KEY, this._filter);
+        this._stored('filter', this._filter);
         this._render();
       };
     });
     const daysControl = this.shadowRoot.querySelector('[data-days]');
     if (daysControl) daysControl.onchange = () => {
       this._daysToShow = Number(daysControl.value);
-      localStorage.setItem(DAYS_KEY, String(this._daysToShow));
+      this._stored('days', this._daysToShow);
       this._dayOffset = 0;
       this._fetchCalendar();
+    };
+    const startDate = this.shadowRoot.querySelector('[data-start-date]');
+    if (startDate) startDate.onchange = () => {
+      const selected = new Date(`${startDate.value}T00:00:00`);
+      const today = this._startDate(0);
+      this._dayOffset = Math.round((selected.getTime() - today.getTime()) / 86400000);
+      this._fetchCalendar();
+    };
+    const density = this.shadowRoot.querySelector('[data-density]');
+    if (density) density.onchange = () => {
+      this._density = this._stored('density', density.value);
+      this._render();
+    };
+    const height = this.shadowRoot.querySelector('[data-height]');
+    if (height) height.onchange = () => {
+      this._cardHeight = this._stored('height', height.value);
+      this._render();
     };
     this.shadowRoot.querySelectorAll('[data-action]').forEach((button) => {
       button.onclick = () => {
@@ -374,13 +412,13 @@ class ArrCalendarCard extends HTMLElement {
     :host{display:block;color:var(--primary-text-color,#202124);--show-color:var(--info-color,#4285f4);--movie-color:var(--error-color,#e64b40)}
     *{box-sizing:border-box}ha-card{overflow:hidden;background:var(--ha-card-background,var(--card-background-color,#fff));border-radius:var(--ha-card-border-radius,24px)}
     .calendar{height:var(--calendar-height);min-height:420px;display:flex;position:relative;flex-direction:column;background:linear-gradient(145deg,color-mix(in srgb,var(--card-background-color,#fff) 96%,var(--primary-color) 4%),var(--card-background-color,#fff))}
-    header{min-height:112px;display:grid;grid-template-columns:1fr auto;grid-template-rows:auto auto;gap:12px;padding:18px 20px;border-bottom:1px solid var(--divider-color,rgba(0,0,0,.12))}.heading{grid-column:1;grid-row:1}.heading h1{font-size:1.35rem;line-height:1.2;margin:0 0 5px;font-weight:700}.heading span{color:var(--secondary-text-color,#777);font-size:.9rem}nav{grid-column:1;grid-row:2;display:flex;gap:6px}.header-controls{grid-column:2;grid-row:1 / span 2;align-self:center;display:flex;gap:7px}
+    header{min-height:112px;display:grid;grid-template-columns:1fr;grid-template-rows:auto auto;gap:12px;padding:18px 20px;border-bottom:1px solid var(--divider-color,rgba(0,0,0,.12))}.heading{grid-column:1;grid-row:1}.heading h1{font-size:1.35rem;line-height:1.2;margin:0 0 5px;font-weight:700}.heading span{color:var(--secondary-text-color,#777);font-size:.9rem}nav{grid-column:1;grid-row:2;display:flex;flex-wrap:wrap;gap:6px}
     button{font:inherit;color:inherit;cursor:pointer}.pill,.round,.days-control{border:1px solid var(--divider-color,rgba(0,0,0,.15));background:color-mix(in srgb,var(--card-background-color,#fff) 88%,var(--primary-text-color) 12%);box-shadow:0 1px 2px rgba(0,0,0,.04)}.pill{padding:7px 14px;border-radius:999px;font-size:.84rem;font-weight:650}.pill:hover,.pill.active{border-color:color-mix(in srgb,var(--primary-color,#4285f4) 60%,transparent);background:color-mix(in srgb,var(--primary-color,#4285f4) 24%,var(--card-background-color,#fff));color:var(--primary-text-color,#202124)}.days-control{display:flex;align-items:center;gap:5px;padding:5px 8px 5px 11px;border-radius:999px;font-size:.78rem;font-weight:650}.days-control select{border:0;border-radius:999px;padding:2px 4px;background:var(--card-background-color,#fff);color:var(--primary-text-color,#222)}
     .content{flex:1;min-height:0;padding:10px 12px;overflow:auto;overscroll-behavior:contain;scrollbar-width:thin}.week{min-height:100%;display:grid;grid-template-columns:repeat(var(--visible-days),minmax(112px,1fr));gap:9px;min-width:var(--week-min)}.day{min-width:0;min-height:100%;display:flex;flex-direction:column;border:1px solid var(--divider-color,rgba(0,0,0,.12));border-radius:13px;background:color-mix(in srgb,var(--card-background-color,#fff) 88%,var(--primary-text-color) 12%);overflow:hidden}.day.today{border-color:var(--primary-color,#4285f4);box-shadow:inset 0 0 0 1px var(--primary-color,#4285f4)}.day h3{height:62px;flex:none;margin:0;display:flex;align-items:center;justify-content:center;gap:3px;border-bottom:1px solid var(--divider-color,rgba(0,0,0,.12));line-height:1.05}.day h3 span,.day h3 b{font-size:1rem;font-weight:700}.today h3{color:var(--primary-color,#4285f4);background:color-mix(in srgb,var(--primary-color,#4285f4) 12%,transparent)}
-    .items{padding:8px;display:flex;flex-direction:column;gap:9px;min-height:120px}.empty{margin:auto;color:var(--secondary-text-color,#777);font-size:.75rem}.release{position:relative;flex:none;min-height:190px;overflow:hidden;border-radius:10px;background:#263238;border:3px solid var(--show-color);box-shadow:0 1px 3px rgba(0,0,0,.2)}.release.movie{border-color:var(--movie-color)}.release img,.no-art{position:absolute;width:100%;height:100%;inset:0;object-fit:cover}.no-art{display:grid;place-items:center;font-size:.65rem;font-weight:800;letter-spacing:.12em;color:#90a4ae;background:linear-gradient(145deg,#263238,#11181c)}.shade{position:absolute;inset:0;background:linear-gradient(to bottom,rgba(0,0,0,.08) 25%,rgba(0,0,0,.88) 100%)}.release-content{position:relative;z-index:1;height:100%;min-height:144px;padding:7px;display:flex;flex-direction:column;align-items:flex-start;color:#fff;text-shadow:0 1px 2px #000}.badges{width:100%;display:flex;gap:4px;align-items:center;flex-wrap:wrap}.badges span,.episode-code{background:rgba(12,18,24,.78);border-radius:5px;padding:3px 6px;font-size:.64rem;font-weight:700}.kind{border-left:3px solid var(--show-color)}.movie .kind{border-color:var(--movie-color)}.instance{margin-left:auto;color:#ddd}.count{background:color-mix(in srgb,var(--show-color) 75%,#111)!important}.episode-code{margin-top:5px;background:color-mix(in srgb,var(--show-color) 70%,#182030)}.release strong{width:100%;margin-top:auto;font-size:.78rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.release small{width:100%;font-size:.65rem;color:#e5e5e5;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px}
+    .items{padding:8px;display:flex;flex-direction:column;gap:9px;min-height:120px}.empty{margin:auto;color:var(--secondary-text-color,#777);font-size:.75rem}.release{position:relative;flex:none;min-height:190px;overflow:hidden;border-radius:10px;background:#263238;border:3px solid var(--show-color);box-shadow:0 1px 3px rgba(0,0,0,.2)}.release.movie{border-color:var(--movie-color)}.release img,.no-art{position:absolute;width:100%;height:100%;inset:0;object-fit:cover}.no-art{display:grid;place-items:center;font-size:.65rem;font-weight:800;letter-spacing:.12em;color:#90a4ae;background:linear-gradient(145deg,#263238,#11181c)}.shade{position:absolute;inset:0;background:linear-gradient(to bottom,rgba(0,0,0,.08) 25%,rgba(0,0,0,.88) 100%)}.release-content{position:relative;z-index:1;height:100%;min-height:144px;padding:7px;display:flex;flex-direction:column;align-items:flex-start;color:#fff;text-shadow:0 1px 2px #000}.badges{width:100%;display:flex;gap:4px;align-items:center;flex-wrap:wrap}.badges span,.episode-code{background:rgba(12,18,24,.78);border-radius:5px;padding:3px 6px;font-size:.64rem;font-weight:700}.kind{border-left:3px solid var(--show-color)}.movie .kind{border-color:var(--movie-color)}.instance{margin-left:auto;color:#ddd}.status{border-left:3px solid var(--warning-color,#f9a825)}.count{background:color-mix(in srgb,var(--show-color) 75%,#111)!important}.episode-code{margin-top:5px;background:color-mix(in srgb,var(--show-color) 70%,#182030)}.release strong{width:100%;margin-top:auto;font-size:.78rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.release small{width:100%;font-size:.65rem;color:#e5e5e5;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px}
     .compact .release{min-height:92px}.compact .release-content{min-height:86px}.compact .release small{display:none}.spacious .release{min-height:205px}.spacious .release-content{min-height:199px}
     footer{height:70px;flex:none;display:flex;align-items:center;justify-content:center;gap:7px}.round{width:40px;height:40px;border-radius:50%;padding:0;font-size:1.35rem}.today-button{width:auto;border-radius:999px;padding:0 22px;font-size:.78rem;color:var(--secondary-text-color,#777)}.round:hover{border-color:var(--primary-color,#4285f4);background:color-mix(in srgb,var(--primary-color,#4285f4) 18%,var(--card-background-color,#fff))}.state{position:absolute;inset:76px 0 70px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px;color:var(--secondary-text-color,#777);text-align:center;padding:20px}.state strong{font-size:1rem;color:var(--primary-text-color,#222)}.state span{font-size:.8rem}.error strong{color:var(--error-color,#e64b40)}.empty-state{pointer-events:none}.empty-state+.state{display:none}.warning{position:absolute;left:15px;bottom:10px;color:var(--warning-color,#f9a825);font-size:.7rem}
-    @media(max-width:800px){.calendar{min-height:420px}header{grid-template-columns:1fr;grid-template-rows:auto auto auto;gap:11px;padding:16px}.heading{grid-column:1;grid-row:1}.header-controls{grid-column:1;grid-row:2;justify-self:start}.header-controls .round{width:36px;height:36px}.header-controls .today-button{width:auto}nav{grid-column:1;grid-row:3}.content{padding:8px}.week{min-width:var(--week-min)}.day{min-height:118px}.day h3{height:48px;flex-direction:row;gap:7px}.day h3 b{margin:0;font-size:1rem}.items{display:flex}.release,.compact .release{height:190px;min-height:190px}.release-content,.compact .release-content{min-height:184px}footer{height:62px;position:sticky;bottom:0;background:var(--card-background-color,#fff);z-index:3}.state{position:relative;inset:auto;min-height:250px}.warning{display:none}}
+    @media(max-width:800px){.calendar{min-height:420px}header{grid-template-columns:1fr;grid-template-rows:auto auto;gap:11px;padding:16px}.heading{grid-column:1;grid-row:1}nav{grid-column:1;grid-row:2}.content{padding:8px}.week{min-width:var(--week-min)}.day{min-height:118px}.day h3{height:48px;flex-direction:row;gap:7px}.day h3 b{margin:0;font-size:1rem}.items{display:flex}.release,.compact .release{height:190px;min-height:190px}.release-content,.compact .release-content{min-height:184px}footer{height:62px;position:sticky;bottom:0;background:var(--card-background-color,#fff);z-index:3}.state{position:relative;inset:auto;min-height:250px}.warning{display:none}}
   </style>`; }
 }
 
@@ -397,7 +435,7 @@ class ArrCalendarCardEditor extends HTMLElement {
       <label><span>card height</span><input data-key="card_height" value="${html(this._config.card_height)}"></label>
       <label><span>refresh interval (seconds)</span><input data-key="refresh_interval" type="number" min="0" value="${Number(this._config.refresh_interval)}"></label>
       <label><span>days to show</span><input data-key="days_to_show" type="number" min="1" max="7" value="${Number(this._config.days_to_show)}"></label>
-      ${['include_radarr2', 'include_sonarr2', 'show_empty_days', 'show_episode_title', 'show_series_title', 'show_instance_badges'].map(toggle).join('')}
+      ${['include_radarr2', 'include_sonarr2', 'show_empty_days', 'show_episode_title', 'show_series_title', 'show_instance_badges', 'show_status_badges'].map(toggle).join('')}
     </div><style>.editor{display:grid;grid-template-columns:1fr 1fr;gap:14px;padding:8px 0}label{display:flex;flex-direction:column;gap:5px;text-transform:capitalize}label span{font-size:12px;color:var(--secondary-text-color)}input,select{border:1px solid var(--divider-color);border-radius:6px;padding:9px;color:var(--primary-text-color);background:var(--card-background-color)}.toggle{flex-direction:row;justify-content:space-between;align-items:center}@media(max-width:600px){.editor{grid-template-columns:1fr}}</style>`;
     this.querySelectorAll('[data-key]').forEach((input) => {
       input.onchange = () => {

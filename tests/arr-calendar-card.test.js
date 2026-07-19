@@ -118,3 +118,12 @@ test('formats consecutive episode releases as compact ranges', () => {
     { season: 2, episode: 1 },
   ]), 'S01E15-E16, S02E01');
 });
+
+test('derives optional release statuses without requiring a badge', () => {
+  const card = new Card();
+  assert.equal(card._status({ hasFile: true, monitored: true }), 'Downloaded');
+  assert.equal(card._status({ status: 'queued' }), 'Queued');
+  assert.equal(card._status({ monitored: false }), 'Unmonitored');
+  assert.equal(card._status({ monitored: true }), 'Monitored');
+  assert.equal(card._status({}), '');
+});
