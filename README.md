@@ -6,10 +6,6 @@ A standalone, always-visible Home Assistant dashboard card for the Arr Stack Int
 > assistance of OpenAI Codex. That assistance is part of the normal development
 > process for this repository and is disclosed here prominently for transparency.
 
-Current release: **v0.4.9**. Maintainers publishing an update should follow
-the complete [release procedure](RELEASE.md); merging a pull request by itself
-does not notify HACS that a new version is available.
-
 ```yaml
 type: custom:arr-calendar-card
 title: Arr Calendar
@@ -98,3 +94,8 @@ a dashboard. This resource step is only necessary for a manual installation.
 ## Credits and license
 
 This project is MIT licensed. The weekly calendar UX and implementation concepts are based on the calendar modal from [martinargalas/ha-arr-stack-card](https://github.com/martinargalas/ha-arr-stack-card), also MIT licensed. Source headers retain attribution to martinargalas where those concepts are implemented.
+
+<img width="901" height="1291" alt="image" src="https://github.com/user-attachments/assets/7edcb81c-4c69-43e9-814e-ed12b8e2431c" />
+
+<img width="2474" height="1639" alt="image" src="https://github.com/user-attachments/assets/a91f6b24-c991-4561-b7d1-d5f8bfff112e" />
+
