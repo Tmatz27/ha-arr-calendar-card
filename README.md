@@ -2,7 +2,7 @@
 
 A standalone, always-visible Home Assistant dashboard card for the Arr Stack Integration calendar experience. It is not a wrapper around Arr Stack Card and it does not open a modal.
 
-Current release: **v0.4.7**. Maintainers publishing an update should follow
+Current release: **v0.4.8**. Maintainers publishing an update should follow
 the complete [release procedure](RELEASE.md); merging a pull request by itself
 does not notify HACS that a new version is available.
 
@@ -20,6 +20,8 @@ show_episode_title: true
 show_series_title: true
 show_instance_badges: true
 show_status_badges: false
+show_release_time: false
+compact_header: false
 days_to_show: 7
 ```
 
@@ -50,6 +52,13 @@ days_to_show: 7
 - Optional `show_status_badges` adds Downloaded, Queued, Monitored, or Unmonitored
   information when the integration provides it. It defaults to `false` to keep
   poster artwork uncluttered.
+- Every poster is keyboard accessible and opens an uncluttered details dialog
+  containing artwork, release date/time, instance, status, episode range, and
+  individual episode titles when available.
+- Optional `show_release_time` adds the local release/air time to poster tiles.
+  It defaults to `false`; time remains available in the details dialog.
+- Optional `compact_header` hides the repeated card title and reduces header
+  height while retaining the date range and controls.
 - Blue show borders and red movie borders make release types recognizable without relying only on text. Both colors follow Home Assistant theme variables (`--info-color` and `--error-color`) when available.
 - Responsive mobile layout that stacks days and scrolls busy days horizontally.
 - Merges Radarr, Sonarr, Radarr 2, and Sonarr 2 data through the authenticated Home Assistant Arr Stack Integration proxy.

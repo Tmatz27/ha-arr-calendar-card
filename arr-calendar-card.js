@@ -6,7 +6,7 @@
  * Copyright (c) martinargalas, licensed under the MIT License.
  */
 
-const CARD_VERSION = '0.4.7';
+const CARD_VERSION = '0.4.8';
 const DEFAULT_CONFIG = {
   week_start: 'monday',
   default_filter: 'all',
@@ -21,6 +21,8 @@ const DEFAULT_CONFIG = {
   show_instance_badges: true,
   days_to_show: 7,
   show_status_badges: false,
+  show_release_time: false,
+  compact_header: false,
 };
 const SERVICES = [
   { key: 'radarr', type: 'movie', label: 'Radarr' },
@@ -178,6 +180,7 @@ class ArrCalendarCard extends HTMLElement {
       instanceKey: service.key,
       dateKey: this._dateKey(date),
       sortTime: date.getTime(),
+      releaseTime: date,
       title,
       episodeTitle: raw.title || raw.episodeTitle || '',
       season: raw.seasonNumber ?? raw.season,
@@ -260,7 +263,7 @@ class ArrCalendarCard extends HTMLElement {
     }
 
     this.shadowRoot.innerHTML = `${this._styles()}<ha-card>
-      <div class="calendar" style="--calendar-height:${html(this._config.card_height)}">
+      <div class="calendar ${this._config.compact_header ? 'compact-header' : ''}" style="--calendar-height:${html(this._config.card_height)}">
         <header>
           <div class="heading"><h1>Arr Calendar</h1><span>${html(range)}</span></div>
           <nav aria-label="Calendar filters">${['all', 'shows', 'movies'].map((filter) => (
@@ -277,6 +280,7 @@ class ArrCalendarCard extends HTMLElement {
           ${this._button('next', '›', 'Next dates')}${this._button('last', '»', 'Go forward one year')}
         </footer>
         ${this._errors.length && this._items.length ? `<div class="warning" title="${html(this._errors.join('\n'))}">Some instances unavailable</div>` : ''}
+        <dialog class="release-dialog" aria-label="Release details"></dialog>
       </div>
     </ha-card>`;
     this._wireEvents();
@@ -327,7 +331,11 @@ class ArrCalendarCard extends HTMLElement {
     const episodeSummary = this._episodeSummary(episodes);
     const titles = episodes.map((episode) => episode.title).filter(Boolean);
     const subtitle = item.type === 'movie' ? '' : (this._config.show_episode_title ? titles.join(' · ') : '');
-    return `<div class="release ${item.type}" title="${html(subtitle || item.title)}">
+    const itemIndex = this._items.indexOf(item);
+    const releaseTime = this._config.show_release_time
+      ? item.releaseTime?.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })
+      : '';
+    return `<div class="release ${item.type}" data-item-index="${itemIndex}" role="button" tabindex="0" title="View details for ${html(item.title)}">
       <div class="no-art" aria-hidden="true">${item.type === 'movie' ? 'MOVIE' : 'SHOW'}</div>
       ${item.posters?.length ? `<img src="${html(item.posters[0])}" data-fallback="${html(item.posters.slice(1).join('|'))}" alt="${html(item.title)} poster" loading="lazy">` : ''}
       <div class="shade"></div>
@@ -338,6 +346,7 @@ class ArrCalendarCard extends HTMLElement {
           ${this._config.show_status_badges && item.status ? `<span class="status">${html(item.status)}</span>` : ''}
         </div>
         ${episodeSummary ? `<span class="episode-code">${html(episodeSummary)}</span>` : ''}
+        ${releaseTime ? `<span class="release-time">${html(releaseTime)}</span>` : ''}
         ${this._config.show_series_title || item.type === 'movie' ? `<strong>${html(item.title)}</strong>` : ''}
         ${subtitle ? `<small>${html(subtitle)}</small>` : ''}
       </div>
@@ -354,6 +363,16 @@ class ArrCalendarCard extends HTMLElement {
           image.src = next;
         }
       });
+    });
+    this.shadowRoot.querySelectorAll('.release[data-item-index]').forEach((release) => {
+      const open = () => this._openDetails(this._items[Number(release.dataset.itemIndex)]);
+      release.onclick = open;
+      release.onkeydown = (event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          open();
+        }
+      };
     });
     this.shadowRoot.querySelectorAll('[data-filter]').forEach((button) => {
       button.onclick = () => {
@@ -396,6 +415,27 @@ class ArrCalendarCard extends HTMLElement {
     });
   }
 
+  _openDetails(item) {
+    if (!item) return;
+    const dialog = this.shadowRoot.querySelector('.release-dialog');
+    if (!dialog) return;
+    const episodes = item.episodes || [];
+    const date = item.releaseTime?.toLocaleDateString(undefined, {
+      weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
+    }) || item.dateKey;
+    const time = item.releaseTime?.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+    dialog.innerHTML = `<button class="dialog-close" aria-label="Close">×</button>
+      <div class="dialog-art">${item.posters?.length ? `<img src="${html(item.posters[0])}" alt="${html(item.title)} poster">` : '<div class="no-dialog-art">No artwork</div>'}</div>
+      <div class="dialog-copy"><span class="dialog-kind">${item.type === 'movie' ? 'Movie' : 'Show'} · ${html(item.instance)}</span>
+        <h2>${html(item.title)}</h2><p>${html(date)}${time ? ` · ${html(time)}` : ''}</p>
+        ${episodes.length ? `<strong>${html(this._episodeSummary(episodes))}</strong><ul>${episodes.map((episode) => `<li>${html(episode.title || `Episode ${episode.episode}`)}</li>`).join('')}</ul>` : ''}
+        ${item.status ? `<p>Status: ${html(item.status)}</p>` : ''}
+      </div>`;
+    dialog.querySelector('.dialog-close').onclick = () => dialog.close();
+    dialog.onclick = (event) => { if (event.target === dialog) dialog.close(); };
+    dialog.showModal();
+  }
+
   _formatDate(date) {
     return date.toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
   }
@@ -407,8 +447,9 @@ class ArrCalendarCard extends HTMLElement {
     header{min-height:112px;display:grid;grid-template-columns:1fr;grid-template-rows:auto auto;gap:12px;padding:18px 20px;border-bottom:1px solid var(--divider-color,rgba(0,0,0,.12))}.heading{grid-column:1;grid-row:1}.heading h1{font-size:1.35rem;line-height:1.2;margin:0 0 5px;font-weight:700}.heading span{color:var(--secondary-text-color,#777);font-size:.9rem}nav{grid-column:1;grid-row:2;display:flex;flex-wrap:wrap;justify-content:center;align-items:center;gap:8px}
     button{font:inherit;color:inherit;cursor:pointer}.pill,.round,.days-control,.calendar-control{border:1px solid var(--divider-color,rgba(0,0,0,.15));background:color-mix(in srgb,var(--card-background-color,#fff) 88%,var(--primary-text-color) 12%);box-shadow:0 1px 2px rgba(0,0,0,.04)}.pill{padding:7px 14px;border-radius:999px;font-size:.84rem;font-weight:650}.pill:hover,.pill.active{border-color:color-mix(in srgb,var(--primary-color,#4285f4) 60%,transparent);background:color-mix(in srgb,var(--primary-color,#4285f4) 24%,var(--card-background-color,#fff));color:var(--primary-text-color,#202124)}.days-control{position:relative;display:grid;grid-template-columns:auto 22px 22px;align-items:center;gap:3px;min-height:36px;padding:5px 9px 5px 13px;border-radius:999px;font-size:.78rem;font-weight:650;cursor:pointer}.days-control strong{font-size:.9rem;text-align:center}.days-control ha-icon{display:flex;align-items:center;justify-content:center;justify-self:center;align-self:center;width:18px;height:18px;line-height:1;--mdc-icon-size:18px}.days-control select{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer}.calendar-control{position:relative;width:36px;height:36px;display:grid;place-items:center;border-radius:50%;padding:0}.calendar-control button{position:absolute;inset:0;width:100%;height:100%;padding:0;border:0;border-radius:50%;background:transparent;display:flex;align-items:center;justify-content:center}.calendar-control ha-icon{display:block;width:20px;height:20px;line-height:1;color:var(--secondary-text-color,#777);--mdc-icon-size:20px}.date-picker{position:absolute;inset:1px;width:34px;height:34px;opacity:0;pointer-events:none}.days-control:hover,.calendar-control:hover{border-color:color-mix(in srgb,var(--primary-color,#4285f4) 60%,transparent);background:color-mix(in srgb,var(--primary-color,#4285f4) 24%,var(--card-background-color,#fff))}.calendar-control:hover ha-icon{color:var(--primary-text-color,#222)}
     .content{flex:1;min-height:0;padding:10px 12px;overflow:auto;overscroll-behavior:contain;scrollbar-width:thin}.week{min-height:100%;display:grid;grid-template-columns:repeat(var(--visible-days),minmax(112px,1fr));gap:9px;min-width:var(--week-min)}.day{min-width:0;min-height:100%;display:flex;flex-direction:column;border:1px solid var(--divider-color,rgba(0,0,0,.12));border-radius:13px;background:color-mix(in srgb,var(--card-background-color,#fff) 88%,var(--primary-text-color) 12%);overflow:hidden}.day.today{border-color:var(--primary-color,#4285f4);box-shadow:inset 0 0 0 1px var(--primary-color,#4285f4)}.day h3{height:62px;flex:none;margin:0;display:flex;align-items:center;justify-content:center;gap:3px;border-bottom:1px solid var(--divider-color,rgba(0,0,0,.12));line-height:1.05}.day h3 span,.day h3 b{font-size:1rem;font-weight:700}.today h3{color:var(--primary-color,#4285f4);background:color-mix(in srgb,var(--primary-color,#4285f4) 12%,transparent)}
-    .items{padding:8px;display:flex;flex-direction:column;gap:9px;min-height:120px}.empty{margin:auto;color:var(--secondary-text-color,#777);font-size:.75rem}.release{position:relative;flex:none;min-height:190px;overflow:hidden;border-radius:10px;background:#263238;border:3px solid var(--show-color);box-shadow:0 1px 3px rgba(0,0,0,.2)}.release.movie{border-color:var(--movie-color)}.release img,.no-art{position:absolute;width:100%;height:100%;inset:0;object-fit:cover}.no-art{display:grid;place-items:center;font-size:.65rem;font-weight:800;letter-spacing:.12em;color:#90a4ae;background:linear-gradient(145deg,#263238,#11181c)}.shade{position:absolute;inset:0;background:linear-gradient(to bottom,rgba(0,0,0,.08) 25%,rgba(0,0,0,.88) 100%)}.release-content{position:relative;z-index:1;height:100%;min-height:144px;padding:7px;display:flex;flex-direction:column;align-items:flex-start;color:#fff;text-shadow:0 1px 2px #000}.badges{width:100%;display:flex;gap:4px;align-items:center;flex-wrap:wrap}.badges span,.episode-code{background:rgba(12,18,24,.78);border-radius:5px;padding:3px 6px;font-size:.64rem;font-weight:700}.kind{border-left:3px solid var(--show-color)}.movie .kind{border-color:var(--movie-color)}.instance{margin-left:auto;color:#ddd}.status{border-left:3px solid var(--warning-color,#f9a825)}.count{background:color-mix(in srgb,var(--show-color) 75%,#111)!important}.episode-code{margin-top:5px;background:color-mix(in srgb,var(--show-color) 70%,#182030)}.release strong{width:100%;margin-top:auto;font-size:.78rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.release small{width:100%;font-size:.65rem;color:#e5e5e5;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px}
+    .items{padding:8px;display:flex;flex-direction:column;gap:9px;min-height:120px}.empty{margin:auto;color:var(--secondary-text-color,#777);font-size:.75rem}.release{position:relative;cursor:pointer;flex:none;min-height:190px;overflow:hidden;border-radius:10px;background:#263238;border:3px solid var(--show-color);box-shadow:0 1px 3px rgba(0,0,0,.2)}.release.movie{border-color:var(--movie-color)}.release:hover,.release:focus-visible{filter:brightness(1.08);outline:2px solid var(--primary-color,#4285f4);outline-offset:1px}.release img,.no-art{position:absolute;width:100%;height:100%;inset:0;object-fit:cover}.no-art{display:grid;place-items:center;font-size:.65rem;font-weight:800;letter-spacing:.12em;color:#90a4ae;background:linear-gradient(145deg,#263238,#11181c)}.shade{position:absolute;inset:0;background:linear-gradient(to bottom,rgba(0,0,0,.08) 25%,rgba(0,0,0,.88) 100%)}.release-content{position:relative;z-index:1;height:100%;min-height:144px;padding:7px;display:flex;flex-direction:column;align-items:flex-start;color:#fff;text-shadow:0 1px 2px #000}.badges{width:100%;display:flex;gap:4px;align-items:center;flex-wrap:wrap}.badges span,.episode-code{background:rgba(12,18,24,.78);border-radius:5px;padding:3px 6px;font-size:.64rem;font-weight:700}.kind{border-left:3px solid var(--show-color)}.movie .kind{border-color:var(--movie-color)}.instance{margin-left:auto;color:#ddd}.status{border-left:3px solid var(--warning-color,#f9a825)}.count{background:color-mix(in srgb,var(--show-color) 75%,#111)!important}.release-time{margin-top:5px;background:rgba(12,18,24,.78);border-radius:5px;padding:3px 6px;font-size:.64rem;font-weight:700}.episode-code{margin-top:5px;background:color-mix(in srgb,var(--show-color) 70%,#182030)}.release strong{width:100%;margin-top:auto;font-size:.78rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.release small{width:100%;font-size:.65rem;color:#e5e5e5;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px}
     .compact .release{min-height:92px}.compact .release-content{min-height:86px}.compact .release small{display:none}.spacious .release{min-height:205px}.spacious .release-content{min-height:199px}
+    .compact-header header{min-height:64px;grid-template-columns:auto 1fr;grid-template-rows:auto;align-items:center}.compact-header .heading{grid-column:1;grid-row:1}.compact-header .heading h1{display:none}.compact-header nav{grid-column:2;grid-row:1}.release-dialog{width:min(680px,calc(100vw - 32px));max-height:min(760px,calc(100vh - 32px));padding:0;border:1px solid var(--divider-color,rgba(255,255,255,.18));border-radius:18px;color:var(--primary-text-color,#eee);background:var(--card-background-color,#202124);box-shadow:0 18px 60px rgba(0,0,0,.55);overflow:auto}.release-dialog::backdrop{background:rgba(0,0,0,.65)}.dialog-close{position:absolute;z-index:2;right:12px;top:12px;width:36px;height:36px;border:0;border-radius:50%;font-size:1.5rem;background:rgba(0,0,0,.72);color:#fff}.dialog-art{height:280px;background:#182024}.dialog-art img{width:100%;height:100%;object-fit:cover}.no-dialog-art{height:100%;display:grid;place-items:center;color:var(--secondary-text-color,#aaa)}.dialog-copy{padding:20px}.dialog-copy h2{margin:6px 0 10px}.dialog-copy p{color:var(--secondary-text-color,#aaa)}.dialog-copy ul{margin:10px 0 0;padding-left:20px}.dialog-kind{font-size:.75rem;text-transform:uppercase;letter-spacing:.08em;color:var(--primary-color,#64b5f6)}
     footer{height:70px;flex:none;display:flex;align-items:center;justify-content:center;gap:7px}.round{width:40px;height:40px;border-radius:50%;padding:0;font-size:1.35rem}.today-button{width:auto;border-radius:999px;padding:0 22px;font-size:.78rem;color:var(--secondary-text-color,#777)}.round:hover{border-color:var(--primary-color,#4285f4);background:color-mix(in srgb,var(--primary-color,#4285f4) 18%,var(--card-background-color,#fff))}.state{position:absolute;inset:76px 0 70px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px;color:var(--secondary-text-color,#777);text-align:center;padding:20px}.state strong{font-size:1rem;color:var(--primary-text-color,#222)}.state span{font-size:.8rem}.error strong{color:var(--error-color,#e64b40)}.empty-state{pointer-events:none}.empty-state+.state{display:none}.warning{position:absolute;left:15px;bottom:10px;color:var(--warning-color,#f9a825);font-size:.7rem}
     @media(max-width:800px){.calendar{min-height:420px}header{grid-template-columns:1fr;grid-template-rows:auto auto;gap:11px;padding:16px}.heading{grid-column:1;grid-row:1}nav{grid-column:1;grid-row:2}.content{padding:8px}.week{min-width:var(--week-min)}.day{min-height:118px}.day h3{height:48px;flex-direction:row;gap:7px}.day h3 b{margin:0;font-size:1rem}.items{display:flex}.release,.compact .release{height:190px;min-height:190px}.release-content,.compact .release-content{min-height:184px}footer{height:62px;position:sticky;bottom:0;background:var(--card-background-color,#fff);z-index:3}.state{position:relative;inset:auto;min-height:250px}.warning{display:none}}
   </style>`; }
@@ -427,7 +468,7 @@ class ArrCalendarCardEditor extends HTMLElement {
       <label><span>card height</span><input data-key="card_height" value="${html(this._config.card_height)}"></label>
       <label><span>refresh interval (seconds)</span><input data-key="refresh_interval" type="number" min="0" value="${Number(this._config.refresh_interval)}"></label>
       <label><span>days to show</span><input data-key="days_to_show" type="number" min="1" max="7" value="${Number(this._config.days_to_show)}"></label>
-      ${['include_radarr2', 'include_sonarr2', 'show_empty_days', 'show_episode_title', 'show_series_title', 'show_instance_badges', 'show_status_badges'].map(toggle).join('')}
+      ${['include_radarr2', 'include_sonarr2', 'show_empty_days', 'show_episode_title', 'show_series_title', 'show_instance_badges', 'show_status_badges', 'show_release_time', 'compact_header'].map(toggle).join('')}
     </div><style>.editor{display:grid;grid-template-columns:1fr 1fr;gap:14px;padding:8px 0}label{display:flex;flex-direction:column;gap:5px;text-transform:capitalize}label span{font-size:12px;color:var(--secondary-text-color)}input,select{border:1px solid var(--divider-color);border-radius:6px;padding:9px;color:var(--primary-text-color);background:var(--card-background-color)}.toggle{flex-direction:row;justify-content:space-between;align-items:center}@media(max-width:600px){.editor{grid-template-columns:1fr}}</style>`;
     this.querySelectorAll('[data-key]').forEach((input) => {
       input.onchange = () => {

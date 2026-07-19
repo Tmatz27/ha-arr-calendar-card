@@ -127,3 +127,13 @@ test('derives optional release statuses without requiring a badge', () => {
   assert.equal(card._status({ monitored: true }), 'Monitored');
   assert.equal(card._status({}), '');
 });
+
+test('keeps the release timestamp for optional tile times and details', () => {
+  const card = new Card();
+  const result = card._normalize({
+    title: 'Episode title',
+    airDateUtc: '2026-07-19T20:30:00Z',
+    series: { title: 'Example show', images: [] },
+  }, { type: 'episode', label: 'Sonarr', key: 'sonarr' });
+  assert.equal(result.releaseTime.getTime(), new Date('2026-07-19T20:30:00Z').getTime());
+});
