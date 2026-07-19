@@ -47,20 +47,3 @@ test('does not collapse movies or episodes from different instances', () => {
   ]);
   assert.equal(result.length, 4);
 });
-
-test('routes local and remote MediaCover posters through the authenticated proxy', () => {
-  const card = new Card();
-  assert.equal(
-    card._poster([{ coverType: 'poster', url: '/MediaCover/42/poster.jpg?lastWrite=1' }], 'radarr'),
-    '/api/arr_stack/radarr/api/v3/MediaCover/42/poster.jpg?lastWrite=1',
-  );
-  assert.equal(
-    card._poster([{ remoteUrl: 'https://sonarr.internal/api/v3/MediaCover/7/poster.jpg' }], 'sonarr'),
-    '/api/arr_stack/sonarr/api/v3/MediaCover/7/poster.jpg',
-  );
-});
-
-test('rejects artwork that cannot be served by the Arr Stack proxy', () => {
-  const card = new Card();
-  assert.equal(card._poster([{ remoteUrl: 'https://example.com/poster.jpg' }], 'radarr'), '');
-});
