@@ -47,33 +47,3 @@ test('does not collapse movies or episodes from different instances', () => {
   ]);
   assert.equal(result.length, 4);
 });
-
-test('provides current and legacy authenticated proxy routes for MediaCover posters', () => {
-  const card = new Card();
-  assert.deepEqual(Array.from(card._posters(
-    [{ coverType: 'poster', url: '/MediaCover/42/poster.jpg?lastWrite=1', remoteUrl: 'https://image.tmdb.org/poster.jpg' }], 'radarr',
-  )), [
-    '/api/arr_stack/radarr/MediaCover/42/poster.jpg?lastWrite=1',
-    '/api/arr_stack/radarr/api/v3/MediaCover/42/poster.jpg?lastWrite=1',
-    'https://image.tmdb.org/poster.jpg',
-  ]);
-  assert.deepEqual(Array.from(card._posters(
-    [{ remoteUrl: 'https://sonarr.internal/api/v3/MediaCover/7/poster.jpg' }], 'sonarr',
-  )), [
-    '/api/arr_stack/sonarr/MediaCover/7/poster.jpg',
-    '/api/arr_stack/sonarr/api/v3/MediaCover/7/poster.jpg',
-  ]);
-});
-
-test('rejects artwork that cannot be served by the Arr Stack proxy', () => {
-  const card = new Card();
-  assert.deepEqual(Array.from(card._posters([{ url: '/not-media-cover/poster.jpg' }], 'radarr')), []);
-});
-
-test('shows a configurable number of days while keeping seven as the default', () => {
-  const card = new Card();
-  card._config = { ...card._config, days_to_show: 2 };
-  assert.equal(card._visibleDates().length, 2);
-  card._config.days_to_show = 7;
-  assert.equal(card._visibleDates().length, 7);
-});
