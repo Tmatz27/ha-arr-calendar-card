@@ -6,7 +6,7 @@
  * Copyright (c) martinargalas, licensed under the MIT License.
  */
 
-const CARD_VERSION = '0.4.4';
+const CARD_VERSION = '0.4.5';
 const DEFAULT_CONFIG = {
   week_start: 'monday',
   default_filter: 'all',
@@ -58,8 +58,6 @@ class ArrCalendarCard extends HTMLElement {
       ? savedDays
       : this._configuredDays();
     this._filter = this._stored('filter') || this._config.default_filter;
-    this._density = this._stored('density') || this._config.item_density;
-    this._cardHeight = this._stored('height') || this._config.card_height;
     this._render();
     this._scheduleRefresh(true);
   }
@@ -257,21 +255,19 @@ class ArrCalendarCard extends HTMLElement {
     } else if (!this._items.length && this._errors.length) {
       content = this._state('error', 'Calendar unavailable', this._errors.join(' · '));
     } else {
-      content = `<section class="week ${html(this._density)}" style="--visible-days:${dates.length};--week-min:${dates.length * 112}px">${dates.map((date) => this._day(date, todayKey)).join('')}</section>`;
+      content = `<section class="week ${html(this._config.item_density)}" style="--visible-days:${dates.length};--week-min:${dates.length * 112}px">${dates.map((date) => this._day(date, todayKey)).join('')}</section>`;
       if (!visibleItems.length) content += this._state('empty-state', 'No releases this week', `Nothing matches the ${this._filter} filter`);
     }
 
     this.shadowRoot.innerHTML = `${this._styles()}<ha-card>
-      <div class="calendar" style="--calendar-height:${html(this._cardHeight)}">
+      <div class="calendar" style="--calendar-height:${html(this._config.card_height)}">
         <header>
           <div class="heading"><h1>Arr Calendar</h1><span>${html(range)}</span></div>
           <nav aria-label="Calendar filters">${['all', 'shows', 'movies'].map((filter) => (
             `<button data-filter="${filter}" class="pill ${this._filter === filter ? 'active' : ''}">${filter[0].toUpperCase() + filter.slice(1)}</button>`
           )).join('')}
             <label class="days-control">Days <select aria-label="Days to show" data-days>${[1, 2, 3, 4, 5, 6, 7].map((days) => `<option value="${days}" ${days === this._daysToShow ? 'selected' : ''}>${days}</option>`).join('')}</select></label>
-            <label class="days-control">Start <input type="date" aria-label="Starting date" data-start-date value="${this._dateKey(dates[0])}"></label>
-            <label class="days-control">Density <select aria-label="Poster density" data-density>${['compact', 'comfortable', 'spacious'].map((density) => `<option ${density === this._density ? 'selected' : ''}>${density}</option>`).join('')}</select></label>
-            <label class="days-control">Height <select aria-label="Card height" data-height>${[['480px', 'Short'], ['720px', 'Medium'], ['960px', 'Tall']].map(([height, label]) => `<option value="${height}" ${height === this._cardHeight ? 'selected' : ''}>${label}</option>`).join('')}</select></label>
+            <label class="calendar-control" title="Jump to date"><ha-icon icon="mdi:calendar-month"></ha-icon><input type="date" aria-label="Jump to date" data-start-date value="${this._dateKey(dates[0])}"></label>
           </nav>
         </header>
         <div class="content">${content}</div>
@@ -380,16 +376,6 @@ class ArrCalendarCard extends HTMLElement {
       this._dayOffset = Math.round((selected.getTime() - today.getTime()) / 86400000);
       this._fetchCalendar();
     };
-    const density = this.shadowRoot.querySelector('[data-density]');
-    if (density) density.onchange = () => {
-      this._density = this._stored('density', density.value);
-      this._render();
-    };
-    const height = this.shadowRoot.querySelector('[data-height]');
-    if (height) height.onchange = () => {
-      this._cardHeight = this._stored('height', height.value);
-      this._render();
-    };
     this.shadowRoot.querySelectorAll('[data-action]').forEach((button) => {
       button.onclick = () => {
         const action = button.dataset.action;
@@ -413,7 +399,7 @@ class ArrCalendarCard extends HTMLElement {
     *{box-sizing:border-box}ha-card{overflow:hidden;background:var(--ha-card-background,var(--card-background-color,#fff));border-radius:var(--ha-card-border-radius,24px)}
     .calendar{height:var(--calendar-height);min-height:420px;display:flex;position:relative;flex-direction:column;background:linear-gradient(145deg,color-mix(in srgb,var(--card-background-color,#fff) 96%,var(--primary-color) 4%),var(--card-background-color,#fff))}
     header{min-height:112px;display:grid;grid-template-columns:1fr;grid-template-rows:auto auto;gap:12px;padding:18px 20px;border-bottom:1px solid var(--divider-color,rgba(0,0,0,.12))}.heading{grid-column:1;grid-row:1}.heading h1{font-size:1.35rem;line-height:1.2;margin:0 0 5px;font-weight:700}.heading span{color:var(--secondary-text-color,#777);font-size:.9rem}nav{grid-column:1;grid-row:2;display:flex;flex-wrap:wrap;gap:6px}
-    button{font:inherit;color:inherit;cursor:pointer}.pill,.round,.days-control{border:1px solid var(--divider-color,rgba(0,0,0,.15));background:color-mix(in srgb,var(--card-background-color,#fff) 88%,var(--primary-text-color) 12%);box-shadow:0 1px 2px rgba(0,0,0,.04)}.pill{padding:7px 14px;border-radius:999px;font-size:.84rem;font-weight:650}.pill:hover,.pill.active{border-color:color-mix(in srgb,var(--primary-color,#4285f4) 60%,transparent);background:color-mix(in srgb,var(--primary-color,#4285f4) 24%,var(--card-background-color,#fff));color:var(--primary-text-color,#202124)}.days-control{display:flex;align-items:center;gap:5px;padding:5px 8px 5px 11px;border-radius:999px;font-size:.78rem;font-weight:650}.days-control select{border:0;border-radius:999px;padding:2px 4px;background:var(--card-background-color,#fff);color:var(--primary-text-color,#222)}
+    button{font:inherit;color:inherit;cursor:pointer}.pill,.round,.days-control,.calendar-control{border:1px solid var(--divider-color,rgba(0,0,0,.15));background:color-mix(in srgb,var(--card-background-color,#fff) 88%,var(--primary-text-color) 12%);box-shadow:0 1px 2px rgba(0,0,0,.04)}.pill{padding:7px 14px;border-radius:999px;font-size:.84rem;font-weight:650}.pill:hover,.pill.active{border-color:color-mix(in srgb,var(--primary-color,#4285f4) 60%,transparent);background:color-mix(in srgb,var(--primary-color,#4285f4) 24%,var(--card-background-color,#fff));color:var(--primary-text-color,#202124)}.days-control{display:flex;align-items:center;gap:5px;padding:5px 8px 5px 11px;border-radius:999px;font-size:.78rem;font-weight:650}.days-control select{border:0;border-radius:999px;padding:2px 4px;background:var(--card-background-color,#fff);color:var(--primary-text-color,#222)}.calendar-control{width:36px;height:36px;position:relative;display:grid;place-items:center;border-radius:50%;cursor:pointer}.calendar-control ha-icon{width:20px;height:20px;color:var(--secondary-text-color,#777)}.calendar-control input{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer}
     .content{flex:1;min-height:0;padding:10px 12px;overflow:auto;overscroll-behavior:contain;scrollbar-width:thin}.week{min-height:100%;display:grid;grid-template-columns:repeat(var(--visible-days),minmax(112px,1fr));gap:9px;min-width:var(--week-min)}.day{min-width:0;min-height:100%;display:flex;flex-direction:column;border:1px solid var(--divider-color,rgba(0,0,0,.12));border-radius:13px;background:color-mix(in srgb,var(--card-background-color,#fff) 88%,var(--primary-text-color) 12%);overflow:hidden}.day.today{border-color:var(--primary-color,#4285f4);box-shadow:inset 0 0 0 1px var(--primary-color,#4285f4)}.day h3{height:62px;flex:none;margin:0;display:flex;align-items:center;justify-content:center;gap:3px;border-bottom:1px solid var(--divider-color,rgba(0,0,0,.12));line-height:1.05}.day h3 span,.day h3 b{font-size:1rem;font-weight:700}.today h3{color:var(--primary-color,#4285f4);background:color-mix(in srgb,var(--primary-color,#4285f4) 12%,transparent)}
     .items{padding:8px;display:flex;flex-direction:column;gap:9px;min-height:120px}.empty{margin:auto;color:var(--secondary-text-color,#777);font-size:.75rem}.release{position:relative;flex:none;min-height:190px;overflow:hidden;border-radius:10px;background:#263238;border:3px solid var(--show-color);box-shadow:0 1px 3px rgba(0,0,0,.2)}.release.movie{border-color:var(--movie-color)}.release img,.no-art{position:absolute;width:100%;height:100%;inset:0;object-fit:cover}.no-art{display:grid;place-items:center;font-size:.65rem;font-weight:800;letter-spacing:.12em;color:#90a4ae;background:linear-gradient(145deg,#263238,#11181c)}.shade{position:absolute;inset:0;background:linear-gradient(to bottom,rgba(0,0,0,.08) 25%,rgba(0,0,0,.88) 100%)}.release-content{position:relative;z-index:1;height:100%;min-height:144px;padding:7px;display:flex;flex-direction:column;align-items:flex-start;color:#fff;text-shadow:0 1px 2px #000}.badges{width:100%;display:flex;gap:4px;align-items:center;flex-wrap:wrap}.badges span,.episode-code{background:rgba(12,18,24,.78);border-radius:5px;padding:3px 6px;font-size:.64rem;font-weight:700}.kind{border-left:3px solid var(--show-color)}.movie .kind{border-color:var(--movie-color)}.instance{margin-left:auto;color:#ddd}.status{border-left:3px solid var(--warning-color,#f9a825)}.count{background:color-mix(in srgb,var(--show-color) 75%,#111)!important}.episode-code{margin-top:5px;background:color-mix(in srgb,var(--show-color) 70%,#182030)}.release strong{width:100%;margin-top:auto;font-size:.78rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.release small{width:100%;font-size:.65rem;color:#e5e5e5;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px}
     .compact .release{min-height:92px}.compact .release-content{min-height:86px}.compact .release small{display:none}.spacious .release{min-height:205px}.spacious .release-content{min-height:199px}
