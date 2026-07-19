@@ -6,8 +6,9 @@
  * Copyright (c) martinargalas, licensed under the MIT License.
  */
 
-const CARD_VERSION = '0.4.2';
+const CARD_VERSION = '0.4.3';
 const FILTER_KEY = 'arr-calendar-card.filter';
+const DAYS_KEY = 'arr-calendar-card.days-to-show';
 const DEFAULT_CONFIG = {
   week_start: 'monday',
   default_filter: 'all',
@@ -44,7 +45,6 @@ class ArrCalendarCard extends HTMLElement {
     this._items = [];
     this._errors = [];
     this._loading = true;
-    this._weekOffset = 0;
     this._dayOffset = 0;
     this._request = 0;
     this._filter = localStorage.getItem(FILTER_KEY) || DEFAULT_CONFIG.default_filter;
@@ -54,6 +54,10 @@ class ArrCalendarCard extends HTMLElement {
     if (!config) throw new Error('Arr Calendar Card requires a configuration.');
     this._config = { ...DEFAULT_CONFIG, ...config };
     this._dayOffset = 0;
+    const savedDays = Number(localStorage.getItem(DAYS_KEY));
+    this._daysToShow = savedDays >= 1 && savedDays <= 7
+      ? savedDays
+      : this._configuredDays();
     this._filter = localStorage.getItem(FILTER_KEY) || this._config.default_filter;
     this._render();
     this._scheduleRefresh(true);
@@ -75,26 +79,25 @@ class ArrCalendarCard extends HTMLElement {
     if (immediate && this._hass) this._fetchCalendar();
   }
 
-  _weekStartDate(offset = this._weekOffset) {
+  _configuredDays() {
+    return Math.max(1, Math.min(7, Number(this._config.days_to_show) || 7));
+  }
+
+  _startDate(offset = this._dayOffset) {
     const date = new Date();
     date.setHours(0, 0, 0, 0);
-    const firstDay = this._config.week_start === 'sunday' ? 0 : 1;
-    date.setDate(date.getDate() - ((date.getDay() - firstDay + 7) % 7) + offset * 7);
+    date.setDate(date.getDate() + offset);
     return date;
   }
 
-  _weekDates() {
-    const start = this._weekStartDate();
-    return Array.from({ length: 7 }, (_, index) => {
+  _visibleDates() {
+    const start = this._startDate();
+    const count = this._daysToShow || this._configuredDays();
+    return Array.from({ length: count }, (_, index) => {
       const date = new Date(start);
       date.setDate(start.getDate() + index);
       return date;
     });
-  }
-
-  _visibleDates() {
-    const count = Math.max(1, Math.min(7, Number(this._config.days_to_show) || 7));
-    return this._weekDates().slice(this._dayOffset, this._dayOffset + count);
   }
 
   _dateKey(date) {
@@ -110,8 +113,8 @@ class ArrCalendarCard extends HTMLElement {
     this._loading = true;
     this._errors = [];
     this._render();
-    const dates = this._weekDates();
-    const end = new Date(dates[6]);
+    const dates = this._visibleDates();
+    const end = new Date(dates[dates.length - 1]);
     end.setDate(end.getDate() + 1);
     const services = SERVICES.filter((service) => !service.flag || this._config[service.flag]);
     const results = await Promise.all(services.map((service) => (
@@ -242,7 +245,9 @@ class ArrCalendarCard extends HTMLElement {
           <div class="heading"><h1>Arr Calendar</h1><span>${html(range)}</span></div>
           <nav aria-label="Calendar filters">${['all', 'shows', 'movies'].map((filter) => (
             `<button data-filter="${filter}" class="pill ${this._filter === filter ? 'active' : ''}">${filter[0].toUpperCase() + filter.slice(1)}</button>`
-          )).join('')}</nav>
+          )).join('')}
+            <label class="days-control">Days <select aria-label="Days to show" data-days>${[1, 2, 3, 4, 5, 6, 7].map((days) => `<option value="${days}" ${days === this._daysToShow ? 'selected' : ''}>${days}</option>`).join('')}</select></label>
+          </nav>
           <div class="header-controls" aria-label="Week navigation">
             ${this._button('first', '«', 'Go back 52 weeks')}${this._button('prev', '‹', 'Previous week')}
             ${this._button('today', 'Today', 'Current week', 'today-button')}
@@ -252,7 +257,7 @@ class ArrCalendarCard extends HTMLElement {
         <div class="content">${content}</div>
         <footer aria-label="Week navigation">
           ${this._button('first', '«', 'Go back 52 weeks')}${this._button('prev', '‹', 'Previous week')}
-          ${this._button('today', this._weekOffset === 0 ? 'This week' : 'Today', 'Current week', 'today-button')}
+          ${this._button('today', this._dayOffset === 0 ? 'Today' : 'Go to today', 'Start with today', 'today-button')}
           ${this._button('next', '›', 'Next week')}${this._button('last', '»', 'Go forward 52 weeks')}
         </footer>
         ${this._errors.length && this._items.length ? `<div class="warning" title="${html(this._errors.join('\n'))}">Some instances unavailable</div>` : ''}
@@ -340,29 +345,22 @@ class ArrCalendarCard extends HTMLElement {
         this._render();
       };
     });
+    const daysControl = this.shadowRoot.querySelector('[data-days]');
+    if (daysControl) daysControl.onchange = () => {
+      this._daysToShow = Number(daysControl.value);
+      localStorage.setItem(DAYS_KEY, String(this._daysToShow));
+      this._dayOffset = 0;
+      this._fetchCalendar();
+    };
     this.shadowRoot.querySelectorAll('[data-action]').forEach((button) => {
       button.onclick = () => {
         const action = button.dataset.action;
-        const count = Math.max(1, Math.min(7, Number(this._config.days_to_show) || 7));
-        if (action === 'prev') {
-          this._dayOffset -= count;
-          if (this._dayOffset < 0) {
-            this._weekOffset -= 1;
-            this._dayOffset = Math.floor(6 / count) * count;
-          }
-        }
-        if (action === 'next') {
-          this._dayOffset += count;
-          if (this._dayOffset >= 7) { this._weekOffset += 1; this._dayOffset = 0; }
-        }
-        if (action === 'today') {
-          this._weekOffset = 0;
-          const firstDay = this._config.week_start === 'sunday' ? 0 : 1;
-          const todayIndex = (new Date().getDay() - firstDay + 7) % 7;
-          this._dayOffset = Math.floor(todayIndex / count) * count;
-        }
-        if (action === 'first') { this._weekOffset -= 52; this._dayOffset = 0; }
-        if (action === 'last') { this._weekOffset += 52; this._dayOffset = 0; }
+        const count = this._daysToShow || this._configuredDays();
+        if (action === 'prev') this._dayOffset -= count;
+        if (action === 'next') this._dayOffset += count;
+        if (action === 'today') this._dayOffset = 0;
+        if (action === 'first') this._dayOffset -= 365;
+        if (action === 'last') this._dayOffset += 365;
         this._fetchCalendar();
       };
     });
@@ -377,12 +375,12 @@ class ArrCalendarCard extends HTMLElement {
     *{box-sizing:border-box}ha-card{overflow:hidden;background:var(--ha-card-background,var(--card-background-color,#fff));border-radius:var(--ha-card-border-radius,24px)}
     .calendar{height:var(--calendar-height);min-height:420px;display:flex;position:relative;flex-direction:column;background:linear-gradient(145deg,color-mix(in srgb,var(--card-background-color,#fff) 96%,var(--primary-color) 4%),var(--card-background-color,#fff))}
     header{min-height:112px;display:grid;grid-template-columns:1fr auto;grid-template-rows:auto auto;gap:12px;padding:18px 20px;border-bottom:1px solid var(--divider-color,rgba(0,0,0,.12))}.heading{grid-column:1;grid-row:1}.heading h1{font-size:1.35rem;line-height:1.2;margin:0 0 5px;font-weight:700}.heading span{color:var(--secondary-text-color,#777);font-size:.9rem}nav{grid-column:1;grid-row:2;display:flex;gap:6px}.header-controls{grid-column:2;grid-row:1 / span 2;align-self:center;display:flex;gap:7px}
-    button{font:inherit;color:inherit;cursor:pointer}.pill,.round{border:1px solid var(--divider-color,rgba(0,0,0,.15));background:color-mix(in srgb,var(--card-background-color,#fff) 88%,var(--primary-text-color) 12%);box-shadow:0 1px 2px rgba(0,0,0,.04)}.pill{padding:7px 14px;border-radius:999px;font-size:.84rem;font-weight:650}.pill:hover,.pill.active{border-color:color-mix(in srgb,var(--primary-color,#4285f4) 60%,transparent);background:color-mix(in srgb,var(--primary-color,#4285f4) 24%,var(--card-background-color,#fff));color:var(--primary-text-color,#202124)}
-    .content{flex:1;min-height:0;padding:10px 12px;overflow-x:auto}.week{height:100%;display:grid;grid-template-columns:repeat(var(--visible-days),minmax(112px,1fr));gap:9px;min-width:var(--week-min)}.day{min-width:0;min-height:0;display:flex;flex-direction:column;border:1px solid var(--divider-color,rgba(0,0,0,.12));border-radius:13px;background:color-mix(in srgb,var(--card-background-color,#fff) 88%,var(--primary-text-color) 12%);overflow:hidden}.day.today{border-color:var(--primary-color,#4285f4);box-shadow:inset 0 0 0 1px var(--primary-color,#4285f4)}.day h3{height:62px;flex:none;margin:0;display:flex;align-items:center;justify-content:center;gap:3px;border-bottom:1px solid var(--divider-color,rgba(0,0,0,.12));line-height:1.05}.day h3 span,.day h3 b{font-size:1rem;font-weight:700}.today h3{color:var(--primary-color,#4285f4);background:color-mix(in srgb,var(--primary-color,#4285f4) 12%,transparent)}
-    .items{padding:8px;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;display:flex;flex-direction:column;gap:9px;min-height:0}.empty{margin:auto;color:var(--secondary-text-color,#777);font-size:.75rem}.release{position:relative;flex:none;min-height:190px;overflow:hidden;border-radius:10px;background:#263238;border:3px solid var(--show-color);box-shadow:0 1px 3px rgba(0,0,0,.2)}.release.movie{border-color:var(--movie-color)}.release img,.no-art{position:absolute;width:100%;height:100%;inset:0;object-fit:cover}.no-art{display:grid;place-items:center;font-size:.65rem;font-weight:800;letter-spacing:.12em;color:#90a4ae;background:linear-gradient(145deg,#263238,#11181c)}.shade{position:absolute;inset:0;background:linear-gradient(to bottom,rgba(0,0,0,.08) 25%,rgba(0,0,0,.88) 100%)}.release-content{position:relative;z-index:1;height:100%;min-height:144px;padding:7px;display:flex;flex-direction:column;align-items:flex-start;color:#fff;text-shadow:0 1px 2px #000}.badges{width:100%;display:flex;gap:4px;align-items:center;flex-wrap:wrap}.badges span,.episode-code{background:rgba(12,18,24,.78);border-radius:5px;padding:3px 6px;font-size:.64rem;font-weight:700}.kind{border-left:3px solid var(--show-color)}.movie .kind{border-color:var(--movie-color)}.instance{margin-left:auto;color:#ddd}.count{background:color-mix(in srgb,var(--show-color) 75%,#111)!important}.episode-code{margin-top:5px;background:color-mix(in srgb,var(--show-color) 70%,#182030)}.release strong{width:100%;margin-top:auto;font-size:.78rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.release small{width:100%;font-size:.65rem;color:#e5e5e5;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px}
+    button{font:inherit;color:inherit;cursor:pointer}.pill,.round,.days-control{border:1px solid var(--divider-color,rgba(0,0,0,.15));background:color-mix(in srgb,var(--card-background-color,#fff) 88%,var(--primary-text-color) 12%);box-shadow:0 1px 2px rgba(0,0,0,.04)}.pill{padding:7px 14px;border-radius:999px;font-size:.84rem;font-weight:650}.pill:hover,.pill.active{border-color:color-mix(in srgb,var(--primary-color,#4285f4) 60%,transparent);background:color-mix(in srgb,var(--primary-color,#4285f4) 24%,var(--card-background-color,#fff));color:var(--primary-text-color,#202124)}.days-control{display:flex;align-items:center;gap:5px;padding:5px 8px 5px 11px;border-radius:999px;font-size:.78rem;font-weight:650}.days-control select{border:0;border-radius:999px;padding:2px 4px;background:var(--card-background-color,#fff);color:var(--primary-text-color,#222)}
+    .content{flex:1;min-height:0;padding:10px 12px;overflow:auto;overscroll-behavior:contain;scrollbar-width:thin}.week{min-height:100%;display:grid;grid-template-columns:repeat(var(--visible-days),minmax(112px,1fr));gap:9px;min-width:var(--week-min)}.day{min-width:0;min-height:100%;display:flex;flex-direction:column;border:1px solid var(--divider-color,rgba(0,0,0,.12));border-radius:13px;background:color-mix(in srgb,var(--card-background-color,#fff) 88%,var(--primary-text-color) 12%);overflow:hidden}.day.today{border-color:var(--primary-color,#4285f4);box-shadow:inset 0 0 0 1px var(--primary-color,#4285f4)}.day h3{height:62px;flex:none;margin:0;display:flex;align-items:center;justify-content:center;gap:3px;border-bottom:1px solid var(--divider-color,rgba(0,0,0,.12));line-height:1.05}.day h3 span,.day h3 b{font-size:1rem;font-weight:700}.today h3{color:var(--primary-color,#4285f4);background:color-mix(in srgb,var(--primary-color,#4285f4) 12%,transparent)}
+    .items{padding:8px;display:flex;flex-direction:column;gap:9px;min-height:120px}.empty{margin:auto;color:var(--secondary-text-color,#777);font-size:.75rem}.release{position:relative;flex:none;min-height:190px;overflow:hidden;border-radius:10px;background:#263238;border:3px solid var(--show-color);box-shadow:0 1px 3px rgba(0,0,0,.2)}.release.movie{border-color:var(--movie-color)}.release img,.no-art{position:absolute;width:100%;height:100%;inset:0;object-fit:cover}.no-art{display:grid;place-items:center;font-size:.65rem;font-weight:800;letter-spacing:.12em;color:#90a4ae;background:linear-gradient(145deg,#263238,#11181c)}.shade{position:absolute;inset:0;background:linear-gradient(to bottom,rgba(0,0,0,.08) 25%,rgba(0,0,0,.88) 100%)}.release-content{position:relative;z-index:1;height:100%;min-height:144px;padding:7px;display:flex;flex-direction:column;align-items:flex-start;color:#fff;text-shadow:0 1px 2px #000}.badges{width:100%;display:flex;gap:4px;align-items:center;flex-wrap:wrap}.badges span,.episode-code{background:rgba(12,18,24,.78);border-radius:5px;padding:3px 6px;font-size:.64rem;font-weight:700}.kind{border-left:3px solid var(--show-color)}.movie .kind{border-color:var(--movie-color)}.instance{margin-left:auto;color:#ddd}.count{background:color-mix(in srgb,var(--show-color) 75%,#111)!important}.episode-code{margin-top:5px;background:color-mix(in srgb,var(--show-color) 70%,#182030)}.release strong{width:100%;margin-top:auto;font-size:.78rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.release small{width:100%;font-size:.65rem;color:#e5e5e5;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px}
     .compact .release{min-height:92px}.compact .release-content{min-height:86px}.compact .release small{display:none}.spacious .release{min-height:205px}.spacious .release-content{min-height:199px}
     footer{height:70px;flex:none;display:flex;align-items:center;justify-content:center;gap:7px}.round{width:40px;height:40px;border-radius:50%;padding:0;font-size:1.35rem}.today-button{width:auto;border-radius:999px;padding:0 22px;font-size:.78rem;color:var(--secondary-text-color,#777)}.round:hover{border-color:var(--primary-color,#4285f4);background:color-mix(in srgb,var(--primary-color,#4285f4) 18%,var(--card-background-color,#fff))}.state{position:absolute;inset:76px 0 70px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px;color:var(--secondary-text-color,#777);text-align:center;padding:20px}.state strong{font-size:1rem;color:var(--primary-text-color,#222)}.state span{font-size:.8rem}.error strong{color:var(--error-color,#e64b40)}.empty-state{pointer-events:none}.empty-state+.state{display:none}.warning{position:absolute;left:15px;bottom:10px;color:var(--warning-color,#f9a825);font-size:.7rem}
-    @media(max-width:800px){.calendar{height:auto;min-height:0}header{grid-template-columns:1fr;grid-template-rows:auto auto auto;gap:11px;padding:16px}.heading{grid-column:1;grid-row:1}.header-controls{grid-column:1;grid-row:2;justify-self:start}.header-controls .round{width:36px;height:36px}.header-controls .today-button{width:auto}nav{grid-column:1;grid-row:3}.content{padding:8px;overflow:visible}.week{min-width:var(--week-min);height:auto}.day{min-height:118px;max-height:360px}.day h3{height:48px;flex-direction:row;gap:7px}.day h3 b{margin:0;font-size:1rem}.items{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(150px,45vw);overflow-x:auto;overflow-y:hidden}.release,.compact .release{height:190px;min-height:190px}.release-content,.compact .release-content{min-height:184px}footer{height:62px;position:sticky;bottom:0;background:var(--card-background-color,#fff);z-index:3}.state{position:relative;inset:auto;min-height:250px}.warning{display:none}}
+    @media(max-width:800px){.calendar{min-height:420px}header{grid-template-columns:1fr;grid-template-rows:auto auto auto;gap:11px;padding:16px}.heading{grid-column:1;grid-row:1}.header-controls{grid-column:1;grid-row:2;justify-self:start}.header-controls .round{width:36px;height:36px}.header-controls .today-button{width:auto}nav{grid-column:1;grid-row:3}.content{padding:8px}.week{min-width:var(--week-min)}.day{min-height:118px}.day h3{height:48px;flex-direction:row;gap:7px}.day h3 b{margin:0;font-size:1rem}.items{display:flex}.release,.compact .release{height:190px;min-height:190px}.release-content,.compact .release-content{min-height:184px}footer{height:62px;position:sticky;bottom:0;background:var(--card-background-color,#fff);z-index:3}.state{position:relative;inset:auto;min-height:250px}.warning{display:none}}
   </style>`; }
 }
 

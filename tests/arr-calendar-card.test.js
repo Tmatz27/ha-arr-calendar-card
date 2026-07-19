@@ -78,6 +78,17 @@ test('shows a configurable number of days while keeping seven as the default', (
   assert.equal(card._visibleDates().length, 7);
 });
 
+test('starts with today and always returns the configured consecutive day count', () => {
+  const card = new Card();
+  card._daysToShow = 3;
+  const dates = card._visibleDates();
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  assert.equal(dates.length, 3);
+  assert.equal(dates[0].getTime(), today.getTime());
+  assert.equal((dates[2].getTime() - dates[0].getTime()) / 86400000, 2);
+});
+
 test('uses only Radarr digital release dates for movies', () => {
   const card = new Card();
   const radarr = { type: 'movie', label: 'Radarr', key: 'radarr' };
