@@ -6,6 +6,7 @@
  * Copyright (c) martinargalas, licensed under the MIT License.
  */
 
+const CARD_VERSION = '0.2.0';
 const CARD_VERSION = '0.1.0';
 const FILTER_KEY = 'arr-calendar-card.filter';
 const DEFAULT_CONFIG = {
@@ -14,6 +15,7 @@ const DEFAULT_CONFIG = {
   include_radarr2: true,
   include_sonarr2: true,
   show_empty_days: true,
+  card_height: '720px',
   card_height: '620px',
   item_density: 'comfortable',
   refresh_interval: 300,
@@ -27,6 +29,10 @@ const SERVICES = [
   { key: 'radarr2', type: 'movie', label: 'Radarr 2', flag: 'include_radarr2' },
   { key: 'sonarr2', type: 'episode', label: 'Sonarr 2', flag: 'include_sonarr2' },
 ];
+
+const html = (value) => String(value ?? '').replace(/[&<>'"]/g, (character) => ({
+  '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;',
+}[character]));
 
 class ArrCalendarCard extends HTMLElement {
   static getConfigElement() { return document.createElement('arr-calendar-card-editor'); }
