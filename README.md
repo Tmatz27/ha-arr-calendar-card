@@ -2,7 +2,7 @@
 
 A standalone, always-visible Home Assistant dashboard card for the Arr Stack Integration calendar experience. It is not a wrapper around Arr Stack Card and it does not open a modal.
 
-Current release: **v0.4.1**. Maintainers publishing an update should follow
+Current release: **v0.4.2**. Maintainers publishing an update should follow
 the complete [release procedure](RELEASE.md); merging a pull request by itself
 does not notify HACS that a new version is available.
 
@@ -30,6 +30,8 @@ days_to_show: 7
   Previous and Next move through each group of days and then into the adjacent week.
 - All, Shows, and Movies filters with remembered selection.
 - Current-day highlighting, poster artwork, movie/show and instance badges, season/episode labels, and independent scrolling for each day.
+- Movies use Radarr's digital release date only; theatrical and physical-only
+  dates are not shown as downloadable releases.
 - Multiple episodes of the same series on the same day and Sonarr instance collapse into one poster with combined episode labels and an episode-count badge.
 - Blue show borders and red movie borders make release types recognizable without relying only on text. Both colors follow Home Assistant theme variables (`--info-color` and `--error-color`) when available.
 - Responsive mobile layout that stacks days and scrolls busy days horizontally.

@@ -6,7 +6,7 @@
  * Copyright (c) martinargalas, licensed under the MIT License.
  */
 
-const CARD_VERSION = '0.4.1';
+const CARD_VERSION = '0.4.2';
 const FILTER_KEY = 'arr-calendar-card.filter';
 const DEFAULT_CONFIG = {
   week_start: 'monday',
@@ -144,8 +144,11 @@ class ArrCalendarCard extends HTMLElement {
   }
 
   _normalize(raw, service) {
-    const dateValue = raw.airDateUtc || raw.airDate || raw.inCinemas || raw.digitalRelease
-      || raw.physicalRelease || raw.releaseDate;
+    // Radarr calendar records can contain theatrical, physical and digital
+    // dates. A download calendar must not advertise a cinema-only release.
+    const dateValue = service.type === 'movie'
+      ? raw.digitalRelease
+      : (raw.airDateUtc || raw.airDate || raw.releaseDate);
     const date = new Date(dateValue);
     if (!dateValue || Number.isNaN(date.getTime())) return null;
     const series = raw.series || {};
@@ -276,15 +279,31 @@ class ArrCalendarCard extends HTMLElement {
     </article>`;
   }
 
-  _episodeCode(episode) {
-    if (episode.season == null || episode.episode == null) return 'Episode';
-    return `S${String(episode.season).padStart(2, '0')}E${String(episode.episode).padStart(2, '0')}`;
+  _episodeSummary(episodes) {
+    const numbered = episodes
+      .filter((episode) => episode.season != null && episode.episode != null)
+      .sort((a, b) => a.season - b.season || a.episode - b.episode);
+    if (!numbered.length) return episodes.length ? 'Episode' : '';
+
+    const ranges = [];
+    for (let index = 0; index < numbered.length;) {
+      const start = numbered[index];
+      let end = start;
+      while (index + 1 < numbered.length
+        && numbered[index + 1].season === start.season
+        && numbered[index + 1].episode === end.episode + 1) {
+        end = numbered[++index];
+      }
+      const prefix = `S${String(start.season).padStart(2, '0')}E${String(start.episode).padStart(2, '0')}`;
+      ranges.push(end === start ? prefix : `${prefix}-E${String(end.episode).padStart(2, '0')}`);
+      index += 1;
+    }
+    return ranges.join(', ');
   }
 
   _item(item) {
     const episodes = item.episodes || [];
-    const codes = episodes.map((episode) => this._episodeCode(episode));
-    const episodeSummary = codes.length > 3 ? `${codes.slice(0, 2).join(' · ')} · +${codes.length - 2}` : codes.join(' · ');
+    const episodeSummary = this._episodeSummary(episodes);
     const titles = episodes.map((episode) => episode.title).filter(Boolean);
     const subtitle = item.type === 'movie' ? '' : (this._config.show_episode_title ? titles.join(' · ') : '');
     return `<div class="release ${item.type}" title="${html(subtitle || item.title)}">

@@ -77,3 +77,33 @@ test('shows a configurable number of days while keeping seven as the default', (
   card._config.days_to_show = 7;
   assert.equal(card._visibleDates().length, 7);
 });
+
+test('uses only Radarr digital release dates for movies', () => {
+  const card = new Card();
+  const radarr = { type: 'movie', label: 'Radarr', key: 'radarr' };
+  assert.equal(card._normalize({
+    title: 'Digital movie',
+    inCinemas: '2026-07-01T00:00:00Z',
+    digitalRelease: '2026-08-15T00:00:00Z',
+  }, radarr).dateKey, '2026-08-15');
+  assert.equal(card._normalize({
+    title: 'Theatrical only',
+    inCinemas: '2026-07-01T00:00:00Z',
+    physicalRelease: '2026-10-01T00:00:00Z',
+  }, radarr), null);
+});
+
+test('formats consecutive episode releases as compact ranges', () => {
+  const card = new Card();
+  assert.equal(card._episodeSummary([
+    { season: 5, episode: 3 },
+    { season: 5, episode: 1 },
+    { season: 5, episode: 2 },
+    { season: 5, episode: 4 },
+  ]), 'S05E01-E04');
+  assert.equal(card._episodeSummary([
+    { season: 1, episode: 15 },
+    { season: 1, episode: 16 },
+    { season: 2, episode: 1 },
+  ]), 'S01E15-E16, S02E01');
+});
