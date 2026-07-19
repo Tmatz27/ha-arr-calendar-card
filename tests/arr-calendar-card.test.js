@@ -23,6 +23,13 @@ const context = {
 vm.runInNewContext(fs.readFileSync('arr-calendar-card.js', 'utf8'), context);
 const Card = definitions.get('arr-calendar-card');
 
+test('provides a customizable title that can be hidden', () => {
+  const config = Card.getStubConfig();
+  assert.equal(config.title, 'Arr Calendar');
+  assert.equal(config.show_title, true);
+  assert.equal(config.compact_header, false);
+});
+
 test('collapses episodes from the same series, instance, and day', () => {
   const card = new Card();
   const common = {

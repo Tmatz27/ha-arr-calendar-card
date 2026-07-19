@@ -2,12 +2,18 @@
 
 A standalone, always-visible Home Assistant dashboard card for the Arr Stack Integration calendar experience. It is not a wrapper around Arr Stack Card and it does not open a modal.
 
-Current release: **v0.4.8**. Maintainers publishing an update should follow
+> **Development disclosure:** This project is coded and maintained with the
+> assistance of OpenAI Codex. That assistance is part of the normal development
+> process for this repository and is disclosed here prominently for transparency.
+
+Current release: **v0.4.9**. Maintainers publishing an update should follow
 the complete [release procedure](RELEASE.md); merging a pull request by itself
 does not notify HACS that a new version is available.
 
 ```yaml
 type: custom:arr-calendar-card
+title: Arr Calendar
+show_title: true
 week_start: monday
 default_filter: all
 include_radarr2: true
@@ -58,7 +64,9 @@ days_to_show: 7
 - Optional `show_release_time` adds the local release/air time to poster tiles.
   It defaults to `false`; time remains available in the details dialog.
 - Optional `compact_header` hides the repeated card title and reduces header
-  height while retaining the date range and controls.
+  area completely, including its filters and date controls. Set `show_title: false`
+  or leave `title` empty to keep the controls while hiding only the title. The
+  redundant text date range above the calendar has been removed in all modes.
 - Blue show borders and red movie borders make release types recognizable without relying only on text. Both colors follow Home Assistant theme variables (`--info-color` and `--error-color`) when available.
 - Responsive mobile layout that stacks days and scrolls busy days horizontally.
 - Merges Radarr, Sonarr, Radarr 2, and Sonarr 2 data through the authenticated Home Assistant Arr Stack Integration proxy.

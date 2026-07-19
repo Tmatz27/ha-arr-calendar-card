@@ -6,8 +6,10 @@
  * Copyright (c) martinargalas, licensed under the MIT License.
  */
 
-const CARD_VERSION = '0.4.8';
+const CARD_VERSION = '0.4.9';
 const DEFAULT_CONFIG = {
+  title: 'Arr Calendar',
+  show_title: true,
   week_start: 'monday',
   default_filter: 'all',
   include_radarr2: true,
@@ -248,8 +250,6 @@ class ArrCalendarCard extends HTMLElement {
     if (!this.shadowRoot) return;
     const dates = this._visibleDates();
     const todayKey = this._dateKey(new Date());
-    const lastDate = dates[dates.length - 1];
-    const range = `${this._formatDate(dates[0])} – ${this._formatDate(lastDate)} ${lastDate.getFullYear()}`;
     const visibleItems = this._items.filter((item) => this._filter === 'all'
       || (this._filter === 'movies' ? item.type === 'movie' : item.type === 'episode'));
     let content;
@@ -263,16 +263,16 @@ class ArrCalendarCard extends HTMLElement {
     }
 
     this.shadowRoot.innerHTML = `${this._styles()}<ha-card>
-      <div class="calendar ${this._config.compact_header ? 'compact-header' : ''}" style="--calendar-height:${html(this._config.card_height)}">
-        <header>
-          <div class="heading"><h1>Arr Calendar</h1><span>${html(range)}</span></div>
+      <div class="calendar" style="--calendar-height:${html(this._config.card_height)}">
+        ${this._config.compact_header ? '' : `<header class="${this._config.show_title && this._config.title ? '' : 'title-hidden'}">
+          ${this._config.show_title && this._config.title ? `<div class="heading"><h1>${html(this._config.title)}</h1></div>` : ''}
           <nav aria-label="Calendar filters">${['all', 'shows', 'movies'].map((filter) => (
             `<button data-filter="${filter}" class="pill ${this._filter === filter ? 'active' : ''}">${filter[0].toUpperCase() + filter.slice(1)}</button>`
           )).join('')}
             <label class="days-control">Days <strong>${this._daysToShow}</strong><ha-icon icon="mdi:chevron-down"></ha-icon><select aria-label="Days to show" data-days>${[1, 2, 3, 4, 5, 6, 7].map((days) => `<option value="${days}" ${days === this._daysToShow ? 'selected' : ''}>${days}</option>`).join('')}</select></label>
             <span class="calendar-control"><button data-calendar-button title="Jump to date" aria-label="Jump to date"><ha-icon icon="mdi:calendar-month"></ha-icon></button><input class="date-picker" type="date" aria-label="Jump to date" data-start-date value="${this._dateKey(dates[0])}"></span>
           </nav>
-        </header>
+        </header>`}
         <div class="content">${content}</div>
         <footer aria-label="Week navigation">
           ${this._button('first', '«', 'Go back one year')}${this._button('prev', '‹', 'Previous dates')}
@@ -436,10 +436,6 @@ class ArrCalendarCard extends HTMLElement {
     dialog.showModal();
   }
 
-  _formatDate(date) {
-    return date.toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
-  }
-
   _styles() { return `<style>
     :host{display:block;color:var(--primary-text-color,#202124);--show-color:var(--info-color,#4285f4);--movie-color:var(--error-color,#e64b40)}
     *{box-sizing:border-box}ha-card{overflow:hidden;background:var(--ha-card-background,var(--card-background-color,#fff));border-radius:var(--ha-card-border-radius,24px)}
@@ -449,7 +445,7 @@ class ArrCalendarCard extends HTMLElement {
     .content{flex:1;min-height:0;padding:10px 12px;overflow:auto;overscroll-behavior:contain;scrollbar-width:thin}.week{min-height:100%;display:grid;grid-template-columns:repeat(var(--visible-days),minmax(112px,1fr));gap:9px;min-width:var(--week-min)}.day{min-width:0;min-height:100%;display:flex;flex-direction:column;border:1px solid var(--divider-color,rgba(0,0,0,.12));border-radius:13px;background:color-mix(in srgb,var(--card-background-color,#fff) 88%,var(--primary-text-color) 12%);overflow:hidden}.day.today{border-color:var(--primary-color,#4285f4);box-shadow:inset 0 0 0 1px var(--primary-color,#4285f4)}.day h3{height:62px;flex:none;margin:0;display:flex;align-items:center;justify-content:center;gap:3px;border-bottom:1px solid var(--divider-color,rgba(0,0,0,.12));line-height:1.05}.day h3 span,.day h3 b{font-size:1rem;font-weight:700}.today h3{color:var(--primary-color,#4285f4);background:color-mix(in srgb,var(--primary-color,#4285f4) 12%,transparent)}
     .items{padding:8px;display:flex;flex-direction:column;gap:9px;min-height:120px}.empty{margin:auto;color:var(--secondary-text-color,#777);font-size:.75rem}.release{position:relative;cursor:pointer;flex:none;min-height:190px;overflow:hidden;border-radius:10px;background:#263238;border:3px solid var(--show-color);box-shadow:0 1px 3px rgba(0,0,0,.2)}.release.movie{border-color:var(--movie-color)}.release:hover,.release:focus-visible{filter:brightness(1.08);outline:2px solid var(--primary-color,#4285f4);outline-offset:1px}.release img,.no-art{position:absolute;width:100%;height:100%;inset:0;object-fit:cover}.no-art{display:grid;place-items:center;font-size:.65rem;font-weight:800;letter-spacing:.12em;color:#90a4ae;background:linear-gradient(145deg,#263238,#11181c)}.shade{position:absolute;inset:0;background:linear-gradient(to bottom,rgba(0,0,0,.08) 25%,rgba(0,0,0,.88) 100%)}.release-content{position:relative;z-index:1;height:100%;min-height:144px;padding:7px;display:flex;flex-direction:column;align-items:flex-start;color:#fff;text-shadow:0 1px 2px #000}.badges{width:100%;display:flex;gap:4px;align-items:center;flex-wrap:wrap}.badges span,.episode-code{background:rgba(12,18,24,.78);border-radius:5px;padding:3px 6px;font-size:.64rem;font-weight:700}.kind{border-left:3px solid var(--show-color)}.movie .kind{border-color:var(--movie-color)}.instance{margin-left:auto;color:#ddd}.status{border-left:3px solid var(--warning-color,#f9a825)}.count{background:color-mix(in srgb,var(--show-color) 75%,#111)!important}.release-time{margin-top:5px;background:rgba(12,18,24,.78);border-radius:5px;padding:3px 6px;font-size:.64rem;font-weight:700}.episode-code{margin-top:5px;background:color-mix(in srgb,var(--show-color) 70%,#182030)}.release strong{width:100%;margin-top:auto;font-size:.78rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.release small{width:100%;font-size:.65rem;color:#e5e5e5;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px}
     .compact .release{min-height:92px}.compact .release-content{min-height:86px}.compact .release small{display:none}.spacious .release{min-height:205px}.spacious .release-content{min-height:199px}
-    .compact-header header{min-height:64px;grid-template-columns:auto 1fr;grid-template-rows:auto;align-items:center}.compact-header .heading{grid-column:1;grid-row:1}.compact-header .heading h1{display:none}.compact-header nav{grid-column:2;grid-row:1}.release-dialog{width:min(680px,calc(100vw - 32px));max-height:min(760px,calc(100vh - 32px));padding:0;border:1px solid var(--divider-color,rgba(255,255,255,.18));border-radius:18px;color:var(--primary-text-color,#eee);background:var(--card-background-color,#202124);box-shadow:0 18px 60px rgba(0,0,0,.55);overflow:auto}.release-dialog::backdrop{background:rgba(0,0,0,.65)}.dialog-close{position:absolute;z-index:2;right:12px;top:12px;width:36px;height:36px;border:0;border-radius:50%;font-size:1.5rem;background:rgba(0,0,0,.72);color:#fff}.dialog-art{height:280px;background:#182024}.dialog-art img{width:100%;height:100%;object-fit:cover}.no-dialog-art{height:100%;display:grid;place-items:center;color:var(--secondary-text-color,#aaa)}.dialog-copy{padding:20px}.dialog-copy h2{margin:6px 0 10px}.dialog-copy p{color:var(--secondary-text-color,#aaa)}.dialog-copy ul{margin:10px 0 0;padding-left:20px}.dialog-kind{font-size:.75rem;text-transform:uppercase;letter-spacing:.08em;color:var(--primary-color,#64b5f6)}
+    .title-hidden{min-height:64px;grid-template-rows:auto}.title-hidden nav{grid-row:1}.release-dialog{width:min(680px,calc(100vw - 32px));max-height:min(760px,calc(100vh - 32px));padding:0;border:1px solid var(--divider-color,rgba(255,255,255,.18));border-radius:18px;color:var(--primary-text-color,#eee);background:var(--card-background-color,#202124);box-shadow:0 18px 60px rgba(0,0,0,.55);overflow:auto}.release-dialog::backdrop{background:rgba(0,0,0,.65)}.dialog-close{position:absolute;z-index:2;right:12px;top:12px;width:36px;height:36px;border:0;border-radius:50%;font-size:1.5rem;background:rgba(0,0,0,.72);color:#fff}.dialog-art{height:280px;background:#182024}.dialog-art img{width:100%;height:100%;object-fit:cover}.no-dialog-art{height:100%;display:grid;place-items:center;color:var(--secondary-text-color,#aaa)}.dialog-copy{padding:20px}.dialog-copy h2{margin:6px 0 10px}.dialog-copy p{color:var(--secondary-text-color,#aaa)}.dialog-copy ul{margin:10px 0 0;padding-left:20px}.dialog-kind{font-size:.75rem;text-transform:uppercase;letter-spacing:.08em;color:var(--primary-color,#64b5f6)}
     footer{height:70px;flex:none;display:flex;align-items:center;justify-content:center;gap:7px}.round{width:40px;height:40px;border-radius:50%;padding:0;font-size:1.35rem}.today-button{width:auto;border-radius:999px;padding:0 22px;font-size:.78rem;color:var(--secondary-text-color,#777)}.round:hover{border-color:var(--primary-color,#4285f4);background:color-mix(in srgb,var(--primary-color,#4285f4) 18%,var(--card-background-color,#fff))}.state{position:absolute;inset:76px 0 70px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px;color:var(--secondary-text-color,#777);text-align:center;padding:20px}.state strong{font-size:1rem;color:var(--primary-text-color,#222)}.state span{font-size:.8rem}.error strong{color:var(--error-color,#e64b40)}.empty-state{pointer-events:none}.empty-state+.state{display:none}.warning{position:absolute;left:15px;bottom:10px;color:var(--warning-color,#f9a825);font-size:.7rem}
     @media(max-width:800px){.calendar{min-height:420px}header{grid-template-columns:1fr;grid-template-rows:auto auto;gap:11px;padding:16px}.heading{grid-column:1;grid-row:1}nav{grid-column:1;grid-row:2}.content{padding:8px}.week{min-width:var(--week-min)}.day{min-height:118px}.day h3{height:48px;flex-direction:row;gap:7px}.day h3 b{margin:0;font-size:1rem}.items{display:flex}.release,.compact .release{height:190px;min-height:190px}.release-content,.compact .release-content{min-height:184px}footer{height:62px;position:sticky;bottom:0;background:var(--card-background-color,#fff);z-index:3}.state{position:relative;inset:auto;min-height:250px}.warning{display:none}}
   </style>`; }
@@ -465,10 +461,11 @@ class ArrCalendarCardEditor extends HTMLElement {
     const toggle = (key) => `<label class="toggle"><span>${key.replaceAll('_', ' ')}</span><input data-key="${key}" type="checkbox" ${this._config[key] ? 'checked' : ''}></label>`;
     this.innerHTML = `<div class="editor">
       ${select('week_start', ['monday', 'sunday'])}${select('default_filter', ['all', 'shows', 'movies'])}${select('item_density', ['compact', 'comfortable', 'spacious'])}
+      <label><span>title</span><input data-key="title" value="${html(this._config.title)}"></label>
       <label><span>card height</span><input data-key="card_height" value="${html(this._config.card_height)}"></label>
       <label><span>refresh interval (seconds)</span><input data-key="refresh_interval" type="number" min="0" value="${Number(this._config.refresh_interval)}"></label>
       <label><span>days to show</span><input data-key="days_to_show" type="number" min="1" max="7" value="${Number(this._config.days_to_show)}"></label>
-      ${['include_radarr2', 'include_sonarr2', 'show_empty_days', 'show_episode_title', 'show_series_title', 'show_instance_badges', 'show_status_badges', 'show_release_time', 'compact_header'].map(toggle).join('')}
+      ${['show_title', 'include_radarr2', 'include_sonarr2', 'show_empty_days', 'show_episode_title', 'show_series_title', 'show_instance_badges', 'show_status_badges', 'show_release_time', 'compact_header'].map(toggle).join('')}
     </div><style>.editor{display:grid;grid-template-columns:1fr 1fr;gap:14px;padding:8px 0}label{display:flex;flex-direction:column;gap:5px;text-transform:capitalize}label span{font-size:12px;color:var(--secondary-text-color)}input,select{border:1px solid var(--divider-color);border-radius:6px;padding:9px;color:var(--primary-text-color);background:var(--card-background-color)}.toggle{flex-direction:row;justify-content:space-between;align-items:center}@media(max-width:600px){.editor{grid-template-columns:1fr}}</style>`;
     this.querySelectorAll('[data-key]').forEach((input) => {
       input.onchange = () => {
