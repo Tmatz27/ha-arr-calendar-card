@@ -2,7 +2,7 @@
 
 A standalone, always-visible Home Assistant dashboard card for the Arr Stack Integration calendar experience. It is not a wrapper around Arr Stack Card and it does not open a modal.
 
-Current release: **v0.4.5**. Maintainers publishing an update should follow
+Current release: **v0.4.6**. Maintainers publishing an update should follow
 the complete [release procedure](RELEASE.md); merging a pull request by itself
 does not notify HACS that a new version is available.
 
@@ -32,7 +32,9 @@ days_to_show: 7
   the selection for that dashboard in the browser. Previous and Next move by
   that many days.
 - A compact calendar icon opens the native date picker for quick date jumps
-  without displaying a date field in the header.
+  without displaying a date field in the header. The centered filter/control row
+  uses full-size click targets and matching hover feedback for filters, Days, and
+  the calendar button.
 - Poster density and card height remain in the Home Assistant visual editor and
   YAML configuration, keeping the everyday card header uncluttered.
 - The initial range always begins with today and continues across week boundaries,
