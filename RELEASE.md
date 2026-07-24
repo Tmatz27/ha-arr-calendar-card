@@ -14,48 +14,27 @@ GitHub release exist.
 3. Confirm that `main` contains the updated `arr-calendar-card.js` and that its
    `CARD_VERSION` matches the version in `package.json`.
 
-With GitHub CLI, the equivalent commands are:
+Merging a version change into `main` runs the release workflow automatically.
+The workflow validates the repository, creates the matching version tag and
+GitHub release when one does not already exist, attaches
+`arr-calendar-card.js`, and removes merged non-default branches.
 
-```bash
-gh pr merge <PR_NUMBER> --merge --delete-branch
-git switch main
-git pull --ff-only origin main
-```
+The workflow can also be run manually from the Actions tab if a previous run
+was interrupted.
 
-## 2. Publish v0.4.9
+## 2. Verify v0.5.0
 
-The repository includes a release workflow. Push the version tag from the
-updated `main` branch:
-
-```bash
-git switch main
-git pull --ff-only origin main
-git tag -a v0.4.9 -m "Arr Calendar Card v0.4.9"
-git push origin v0.4.9
-```
-
-The tag starts `.github/workflows/release.yml`, which validates the repository,
-creates the GitHub release, and attaches `arr-calendar-card.js`. On GitHub,
-verify that **Releases** shows `v0.4.9` and that the JavaScript file is attached.
-
-If the tag was accidentally created from the wrong commit, delete it before
-trying again:
-
-```bash
-git tag -d v0.4.9
-git push origin :refs/tags/v0.4.9
-```
-
-Then update `main`, recreate the tag, and push it again. Do not reuse or silently
+On GitHub, verify that **Releases** shows `v0.5.0`, the tag points to the merge
+commit on `main`, and the JavaScript file is attached. Do not reuse or silently
 move a published release tag after users may have installed it; increment the
 patch version instead.
 
 ## 3. Refresh HACS and Home Assistant
 
-1. In HACS, open **Arr Calendar Card** and select **Update** to `v0.4.9`.
+1. In HACS, open **Arr Calendar Card** and select **Update** to `v0.5.0`.
 2. Wait for the download to finish, then perform a hard refresh of the Home
    Assistant browser or fully close and reopen the companion app.
-3. In the browser developer console, confirm the card banner reports `v0.4.9`.
+3. In the browser developer console, confirm the card banner reports `v0.5.0`.
 
 If HACS still shows the old version, confirm that the GitHub release is published
 (not a draft), its tag is newer than the prior release, and the tag points to the
