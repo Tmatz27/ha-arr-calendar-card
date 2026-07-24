@@ -10,19 +10,21 @@ A standalone, always-visible Home Assistant dashboard card for the Arr Stack Int
 type: custom:arr-calendar-card
 title: Arr Calendar
 show_title: true
+start_mode: today
 week_start: monday
 default_filter: all
-include_radarr2: true
-include_sonarr2: true
+include_radarr2: false
+include_sonarr2: false
 show_empty_days: true
 card_height: 720px
 item_density: comfortable
-refresh_interval: 300
+refresh_interval: 21600
 show_episode_title: true
 show_series_title: true
 show_instance_badges: true
 show_status_badges: false
 show_release_time: false
+show_bluf: false
 compact_header: false
 days_to_show: 7
 ```
@@ -30,6 +32,8 @@ days_to_show: 7
 ## Features
 
 - Seven-day weekly layout with Previous, Next, First, Last, and Today controls.
+- `start_mode: today` begins with today. Set `start_mode: week` to begin with
+  the current Monday or Sunday according to `week_start`.
 - Configurable `days_to_show` from 1–7. The default displays the whole week;
   smaller mobile cards can display, for example, two or four days at a time.
   The **Days** selector on the card changes this without editing YAML and remembers
@@ -42,15 +46,22 @@ days_to_show: 7
   native pickers can open reliably, while the centered MDI icon stays visible.
 - Poster density and card height remain in the Home Assistant visual editor and
   YAML configuration, keeping the everyday card header uncluttered.
-- The initial range always begins with today and continues across week boundaries,
-  so a three-day view on Sunday still displays Sunday, Monday, and Tuesday.
+- In the default today-first mode, the initial range continues across week
+  boundaries, so a three-day view on Sunday still displays Sunday, Monday, and
+  Tuesday.
 - All, Shows, and Movies filters with remembered selection.
+- Optional `show_bluf` summary with today's movie/show totals and the next
+  release. It can be enabled directly in the visual editor.
 - Current-day highlighting, poster artwork, movie/show and instance badges, and
   season/episode labels. Busy calendars use one scrollbar for the whole card
   instead of a separate scrollbar in every day.
+- Day headers include month and year context, so date jumps remain clear.
 - Movies use Radarr's digital release date only; theatrical and physical-only
-  dates are not shown as downloadable releases.
+  dates are not shown as downloadable releases. Radarr's calendar date remains
+  stable in local time, while exact Sonarr air times are converted to local time.
 - Multiple episodes of the same series on the same day and Sonarr instance collapse into one poster with combined episode labels and an episode-count badge.
+- Collapsed shows aggregate mixed episode states, such as `2/3 downloaded`,
+  instead of inheriting the first episode's status.
 - Optional `show_status_badges` adds Downloaded, Queued, Monitored, or Unmonitored
   information when the integration provides it. It defaults to `false` to keep
   poster artwork uncluttered.
@@ -67,6 +78,9 @@ days_to_show: 7
 - Responsive mobile layout that stacks days and scrolls busy days horizontally.
 - Merges Radarr, Sonarr, Radarr 2, and Sonarr 2 data through the authenticated Home Assistant Arr Stack Integration proxy.
 - Light/dark Home Assistant theme support and loading, empty, unavailable, and API-error states.
+- Six-hour background refresh by default. Existing releases remain visible
+  while an update runs, and refresh pauses while the browser tab is hidden.
+- Native sizing hints for both masonry and Sections dashboards.
 - Visual card editor support.
 
 ## Requirements
@@ -98,4 +112,3 @@ This project is MIT licensed. The weekly calendar UX and implementation concepts
 <img width="901" height="1291" alt="image" src="https://github.com/user-attachments/assets/7edcb81c-4c69-43e9-814e-ed12b8e2431c" />
 
 <img width="2474" height="1639" alt="image" src="https://github.com/user-attachments/assets/a91f6b24-c991-4561-b7d1-d5f8bfff112e" />
-

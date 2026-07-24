@@ -2,8 +2,9 @@ name: Release
 
 on:
   push:
-    tags:
-      - 'v*'
+    branches:
+      - main
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -12,8 +13,10 @@ jobs:
   release:
     runs-on: ubuntu-latest
     steps:
-      - name: Check out tagged source
+      - name: Check out main
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -21,11 +24,42 @@ jobs:
           node-version: 22
 
       - name: Validate release
-        run: |
-          npm run validate
-          test "v$(node -p "require('./package.json').version")" = "${GITHUB_REF_NAME}"
+        run: npm run validate
 
-      - name: Publish GitHub release
+      - name: Publish version when needed
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "${GITHUB_REF_NAME}" arr-calendar-card.js --generate-notes --verify-tag
+        run: |
+          version="v$(node -p "require('./package.json').version")"
+          if gh release view "${version}" >/dev/null 2>&1; then
+            echo "${version} is already published"
+          else
+            if ! git rev-parse --verify --quiet "refs/tags/${version}" >/dev/null; then
+              git config user.name "github-actions[bot]"
+              git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+              git tag -a "${version}" -m "Arr Calendar Card ${version}"
+              git push origin "${version}"
+            fi
+            gh release create "${version}" arr-calendar-card.js \
+              --generate-notes \
+              --verify-tag \
+              --title "Arr Calendar Card ${version}"
+          fi
+
+      - name: Remove merged branches
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git fetch origin '+refs/heads/*:refs/remotes/origin/*'
+          git for-each-ref --format='%(refname:short)' refs/remotes/origin/ |
+            while read -r ref; do
+              branch="${ref#origin/}"
+              if [ "${branch}" = "main" ] || [ "${branch}" = "HEAD" ]; then
+                continue
+              fi
+              if git merge-base --is-ancestor "${ref}" origin/main; then
+                echo "Deleting merged branch ${branch}"
+                gh api --method DELETE \
+                  "repos/${GITHUB_REPOSITORY}/git/refs/heads/${branch}" || true
+              fi
+            done
